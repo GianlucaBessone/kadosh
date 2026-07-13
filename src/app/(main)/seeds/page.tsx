@@ -39,7 +39,7 @@ export default async function SeedsPage() {
           </div>
         )}
 
-        {seeds.map((seed) => {
+        {seeds.map((seed: any) => {
           const progress = Math.min(100, Math.round((seed.currentAmount / seed.targetAmount) * 100))
           const isHarvested = seed.status === 'HARVESTED'
           const isReady = progress >= 100 && !isHarvested
