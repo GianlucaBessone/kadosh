@@ -1,4 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
@@ -44,15 +45,23 @@ export default function RegisterTransactionPage() {
 
             <div className="space-y-2">
               <Label htmlFor="category" className="text-xs text-muted-foreground ml-2">Categoría</Label>
-              <select 
-                id="category" 
-                className="flex h-12 w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-2 text-sm shadow-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-              >
-                <option value="">Selecciona una categoría...</option>
-                <option value="supermarket">Supermercado</option>
-                <option value="housing">Hogar</option>
-                <option value="transport">Transporte</option>
-              </select>
+              <Select name="category" required>
+                <SelectTrigger id="category" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary text-base">
+                  <SelectValue placeholder="Selecciona una categoría..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="supermarket">🛒 Supermercado</SelectItem>
+                  <SelectItem value="housing">🏠 Hogar</SelectItem>
+                  <SelectItem value="transport">🚗 Transporte</SelectItem>
+                  <SelectItem value="food">🍽️ Comida / Restaurantes</SelectItem>
+                  <SelectItem value="health">💊 Salud</SelectItem>
+                  <SelectItem value="education">📚 Educación</SelectItem>
+                  <SelectItem value="entertainment">🎬 Entretenimiento</SelectItem>
+                  <SelectItem value="services">💡 Servicios</SelectItem>
+                  <SelectItem value="clothing">👕 Ropa</SelectItem>
+                  <SelectItem value="other">📦 Otros</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">
@@ -97,15 +106,19 @@ export default function RegisterTransactionPage() {
 
             <div className="space-y-2">
               <Label htmlFor="category-income" className="text-xs text-muted-foreground ml-2">Categoría</Label>
-              <select 
-                id="category-income" 
-                className="flex h-12 w-full items-center justify-between rounded-2xl border border-border bg-card px-4 py-2 text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              >
-                <option value="">Selecciona una categoría...</option>
-                <option value="salary">Salario</option>
-                <option value="freelance">Freelance</option>
-                <option value="gifts">Regalos</option>
-              </select>
+              <Select name="category" required>
+                <SelectTrigger id="category-income" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary text-base">
+                  <SelectValue placeholder="Selecciona una categoría..." />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="salary">💼 Salario</SelectItem>
+                  <SelectItem value="freelance">💻 Freelance</SelectItem>
+                  <SelectItem value="gifts">🎁 Regalos</SelectItem>
+                  <SelectItem value="investments">📈 Inversiones</SelectItem>
+                  <SelectItem value="business">🏢 Negocio</SelectItem>
+                  <SelectItem value="other">📦 Otros</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div className="space-y-2">

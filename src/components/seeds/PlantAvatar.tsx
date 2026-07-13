@@ -12,8 +12,9 @@ export function PlantAvatar({ progress, className = '' }: PlantAvatarProps) {
   const stage = progress === 0 ? 0 : progress < 30 ? 1 : progress < 70 ? 2 : progress < 100 ? 3 : 4
 
   return (
-    <div className={`relative flex items-center justify-center overflow-hidden ${className}`}>
-      {/* Tierra / Base */}
+    <div className={`flex items-center justify-center ${className}`}>
+      <div className="relative w-32 h-32 flex items-center justify-center">
+        {/* Tierra / Base */}
       <motion.div 
         className="absolute bottom-2 w-12 h-3 bg-[#e8c5a3]/50 rounded-full"
         initial={{ scale: 0 }}
@@ -158,6 +159,7 @@ export function PlantAvatar({ progress, className = '' }: PlantAvatarProps) {
           </>
         )}
       </motion.div>
+      </div>
     </div>
   )
 }

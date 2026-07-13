@@ -9,12 +9,13 @@ import prisma from '@/lib/prisma'
 import { getAuthUser } from '@/features/auth/user'
 import { waterSeed, harvestSeed } from '@/features/seeds/actions'
 
-export default async function SeedDetailPage({ params }: { params: { id: string } }) {
+export default async function SeedDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await getAuthUser()
   if (!user) redirect('/login')
 
   const seed = await prisma.seedGoal.findUnique({
-    where: { id: params.id, userId: user.id }
+    where: { id: id, userId: user.id }
   })
 
   if (!seed) redirect('/seeds')
