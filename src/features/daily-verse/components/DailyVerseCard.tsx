@@ -8,6 +8,14 @@ import { DailyVerse, db } from '@/lib/db';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { ShareVerseModal } from './ShareVerseModal';
 
+const LeafIcon = ({ className }: { className?: string }) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className={className}>
+    <path d="M12 22c0-8 6-12 10-12-1 9-6 12-10 12z" />
+    <path d="M12 22c0-6-4-10-10-10 1 8 6 10 10 10z" />
+    <path d="M12 22V12" />
+  </svg>
+);
+
 export function DailyVerseCard() {
   const [verse, setVerse] = useState<DailyVerse | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -36,32 +44,35 @@ export function DailyVerseCard() {
   return (
     <>
       <Card className="bg-primary/5 border-none shadow-none rounded-3xl relative overflow-hidden mt-6">
-        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none">
+        <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none z-0">
           <Droplet className="w-24 h-24" />
         </div>
-        <CardContent className="p-6">
-          <div className="flex items-center justify-between mb-4 relative z-10">
+        
+        <CardContent className="p-6 relative z-10">
+          <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
-              <span className="text-xl">🌿</span>
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <LeafIcon className="w-5 h-5 text-primary" />
+              <span className="text-xs font-semibold uppercase tracking-wider text-primary/80">
                 Versículo de hoy
               </span>
             </div>
-            <button 
-              onClick={() => setIsShareModalOpen(true)}
-              className="p-2 rounded-full hover:bg-primary/10 text-primary transition-colors bg-background/50 backdrop-blur-sm"
-              title="Compartir"
-            >
-              <Share2 className="w-4 h-4" />
-            </button>
           </div>
 
-          <div className="flex flex-col gap-3 relative z-10">
-            <blockquote className="text-sm font-medium italic text-primary/90 leading-relaxed">
-              "{verse.text}"
+          {/* Botón Compartir en la esquina */}
+          <button 
+            onClick={() => setIsShareModalOpen(true)}
+            className="absolute top-4 right-4 p-2 rounded-full text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors z-20"
+            title="Compartir"
+          >
+            <Share2 className="w-4 h-4" />
+          </button>
+
+          <div className="flex flex-col gap-3">
+            <blockquote className="text-sm font-medium italic text-foreground/90 leading-relaxed text-center px-2">
+              &quot;{verse.text}&quot;
             </blockquote>
             
-            <div className="text-left">
+            <div className="text-center">
               <span className="text-xs text-primary/70 font-semibold uppercase">
                 {verse.reference}
               </span>
