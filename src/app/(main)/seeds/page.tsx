@@ -4,6 +4,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import prisma from '@/lib/prisma'
+import { SeedGoal } from '@prisma/client'
 import { getAuthUser } from '@/features/auth/user'
 import { redirect } from 'next/navigation'
 
@@ -39,7 +40,7 @@ export default async function SeedsPage() {
           </div>
         )}
 
-        {seeds.map((seed: any) => {
+        {seeds.map((seed: SeedGoal) => {
           const progress = Math.min(100, Math.round((seed.currentAmount / seed.targetAmount) * 100))
           const isHarvested = seed.status === 'HARVESTED'
           const isReady = progress >= 100 && !isHarvested
