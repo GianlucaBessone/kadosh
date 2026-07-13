@@ -30,14 +30,28 @@ model User {
 model Settings {
   id             String   @id @default(uuid()) @db.Uuid
   userId         String   @unique @db.Uuid
-  theme          String   @default("light") // light, dark, system
-  notifications  Boolean  @default(true)
-  dailyVerse     Boolean  @default(true)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  deletedAt      DateTime?
+  theme             String   @default("light") // light, dark, system
+  notifications     Boolean  @default(true)
+  dailyVerse        Boolean  @default(true)
+  showReflection    Boolean  @default(true)
+  offlineDownload   Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum VerseCategory {
+  MAYORDOMIA
+  SABIDURIA
+  TRABAJO
+  CONFIANZA
+  GENEROSIDAD
+  GRATITUD
+  PAZ
+  FE
+  ESPERANZA
 }
 
 model Account {
@@ -131,13 +145,22 @@ model Tithe {
 }
 
 model DailyVerse {
-  id        String   @id @default(uuid()) @db.Uuid
-  verse     String
-  reference String
-  date      DateTime @db.Date // Ensures one verse per day
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  deletedAt DateTime?
+  id          String        @id @default(uuid()) @db.Uuid
+  reference   String
+  book        String
+  chapter     Int
+  verseStart  Int
+  verseEnd    Int?
+  category    VerseCategory
+  theme       String
+  text        String
+  reflection  String?
+  dayOfYear   Int           // 1-365
+  active      Boolean       @default(true)
+  isFavorite  Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  deletedAt   DateTime?
 }
 
 model Notification {

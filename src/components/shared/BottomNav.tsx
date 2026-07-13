@@ -28,6 +28,7 @@ export function BottomNav() {
             <Link 
               key={item.name} 
               href={item.href}
+              prefetch={true}
               className="relative -top-5 flex h-16 w-16 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-transform active:scale-95"
             >
               <Icon className="h-8 w-8" />
@@ -40,6 +41,7 @@ export function BottomNav() {
           <Link
             key={item.name}
             href={item.href}
+            prefetch={true}
             className={cn(
               "flex flex-col items-center justify-center gap-1 min-w-[48px] transition-colors",
               isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"

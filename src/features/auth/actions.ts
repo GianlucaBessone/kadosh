@@ -14,7 +14,7 @@ export async function login(formData: FormData) {
   })
 
   if (error) {
-    redirect(`/login?error=${encodeURIComponent(error.message)}`)
+    redirect(`/?error=${encodeURIComponent(error.message)}`)
   }
 
   redirect('/home')
@@ -39,10 +39,10 @@ export async function register(formData: FormData) {
   })
 
   if (error) {
-    redirect(`/register?error=${encodeURIComponent(error.message)}`)
+    redirect(`/?error=${encodeURIComponent(error.message)}`)
   }
 
-  redirect('/login?message=Verifica tu correo electrónico para continuar.')
+  redirect('/?message=Verifica tu correo electrónico para continuar.')
 }
 
 export async function loginWithGoogle() {
@@ -63,5 +63,5 @@ export async function loginWithGoogle() {
 export async function logout() {
   const supabase = await createClient()
   await supabase.auth.signOut()
-  redirect('/login')
+  redirect('/')
 }

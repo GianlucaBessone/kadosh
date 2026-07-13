@@ -5,7 +5,14 @@ import prisma from '@/lib/prisma'
 
 export async function getAuthUser() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  let user = null;
+  try {
+    const { data } = await supabase.auth.getUser();
+    user = data.user;
+  } catch (error) {
+    console.warn('Supabase auth error (ignoring for offline-first):', error);
+    return null;
+  }
   
   if (!user) return null
 

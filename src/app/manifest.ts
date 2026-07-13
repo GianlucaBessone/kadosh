@@ -11,11 +11,22 @@ export default function manifest(): MetadataRoute.Manifest {
     theme_color: '#FAF9F7',
     icons: [
       {
-        src: '/favicon.ico',
-        sizes: 'any',
-        type: 'image/x-icon',
+        src: '/icon-192x192.png',
+        sizes: '192x192',
+        type: 'image/png',
+        purpose: 'maskable',
       },
-      // You should add 192x192 and 512x512 icons in the public folder.
+      {
+        src: '/icon-512x512.png',
+        sizes: '512x512',
+        type: 'image/png',
+        purpose: 'maskable',
+      },
+      {
+        src: '/apple-touch-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
+      }
     ],
   }
 }

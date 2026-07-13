@@ -1,12 +1,41 @@
+'use client';
+
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
-import { createSeedGoal } from '@/features/seeds/actions'
+import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
+import { SeedService } from '@/services/seedService'
+import { db } from '@/lib/db'
 
 export default function NewSeedPage() {
+  const router = useRouter();
+
+  const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const name = formData.get('name') as string;
+    const targetAmount = parseFloat(formData.get('targetAmount') as string);
+    
+    if (name && targetAmount > 0) {
+      const user = await db.users.orderBy('id').first();
+      if (!user) return;
+
+      await SeedService.createSeedGoal({
+        userId: user.id,
+        name,
+        targetAmount,
+        currentAmount: 0,
+        status: 'ACTIVE',
+        targetDate: null
+      });
+      
+      router.push('/seeds');
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       
@@ -24,7 +53,7 @@ export default function NewSeedPage() {
         </div>
       </div>
 
-      <form action={createSeedGoal} className="flex flex-col gap-6">
+      <form onSubmit={handleCreate} className="flex flex-col gap-6">
         
         <div className="space-y-2">
           <Label htmlFor="name" className="text-xs text-muted-foreground ml-2">¿Qué propósito tiene esta semilla?</Label>

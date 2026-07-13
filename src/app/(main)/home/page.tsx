@@ -1,42 +1,49 @@
-import { Suspense } from 'react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { ArrowDownIcon, ArrowUpIcon, Droplet, HandHeart, Plus } from 'lucide-react'
-import Link from 'next/link'
-import prisma from '@/lib/prisma'
+'use client';
 
-export default async function HomePage() {
-  const latestVerse = await prisma.dailyVerse.findFirst({
-    orderBy: { date: 'desc' }
-  })
+import { Card, CardContent } from '@/components/ui/card';
+import { ArrowDownIcon, ArrowUpIcon, Droplet, HandHeart } from 'lucide-react';
+import Link from 'next/link';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
+import { DailyVerseCard } from '@/features/daily-verse/components/DailyVerseCard';
+
+export default function HomePage() {
+  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
+  const totalBalance = accounts.reduce((acc, account) => acc + account.balance, 0);
+
+  // We could also calculate incomes and expenses for the current month.
+  // For simplicity, let's just grab the transactions and sum them up.
+  const transactions = useLiveQuery(() => db.transactions.orderBy('date').reverse().limit(5).toArray()) || [];
+  
+  // Calculate current month's stats (approximation)
+  const currentMonthStart = new Date();
+  currentMonthStart.setDate(1);
+  currentMonthStart.setHours(0, 0, 0, 0);
+  
+  const currentMonthTx = useLiveQuery(() => 
+    db.transactions.where('date').aboveOrEqual(currentMonthStart.toISOString()).toArray()
+  ) || [];
+
+  const incomes = currentMonthTx.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
+  const expenses = currentMonthTx.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount, 0);
+
+  const activeSeedsCount = useLiveQuery(() => db.seedGoals.where('status').equals('ACTIVE').count()) || 0;
+
+  const user = useLiveQuery(() => db.users.orderBy('id').first());
+  const userName = user?.name ? user.name.split(' ')[0] : 'Usuario';
 
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       {/* Saludo */}
       <div className="flex flex-col gap-1 mt-2">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Hola, Gianluca</h1>
+        <h1 className="text-2xl font-semibold tracking-tight text-foreground">Hola, {userName}</h1>
         <p className="text-sm text-muted-foreground">Tu administración en paz y orden.</p>
       </div>
-
-      {/* Versículo Diario (Opcional) */}
-      <Card className="bg-primary/5 border-none shadow-none rounded-3xl relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-4 opacity-10">
-          <Droplet className="w-24 h-24" />
-        </div>
-        <CardContent className="p-6">
-          <p className="text-sm font-medium italic text-primary/90 leading-relaxed">
-            "{latestVerse?.verse || 'Donde esté tu tesoro, allí estará también tu corazón.'}"
-          </p>
-          <p className="text-xs text-primary/70 mt-2 font-semibold">
-            {latestVerse?.reference || 'MATEO 6:21'}
-          </p>
-        </CardContent>
-      </Card>
 
       {/* Balance Disponible */}
       <div className="flex flex-col gap-2 items-center justify-center py-6">
         <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Balance Total</span>
-        <h2 className="text-5xl font-bold tracking-tighter text-foreground">$ 1,245.50</h2>
+        <h2 className="text-5xl font-bold tracking-tighter text-foreground">$ {totalBalance.toFixed(2)}</h2>
       </div>
 
       {/* Resumen del Mes */}
@@ -49,7 +56,7 @@ export default async function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Ingresos</span>
             </div>
-            <span className="text-lg font-bold text-foreground">$ 3,500.00</span>
+            <span className="text-lg font-bold text-foreground">$ {incomes.toFixed(2)}</span>
           </CardContent>
         </Card>
         
@@ -61,7 +68,7 @@ export default async function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Gastos</span>
             </div>
-            <span className="text-lg font-bold text-foreground">$ 1,820.00</span>
+            <span className="text-lg font-bold text-foreground">$ {expenses.toFixed(2)}</span>
           </CardContent>
         </Card>
 
@@ -73,7 +80,7 @@ export default async function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Diezmo</span>
             </div>
-            <span className="text-lg font-bold text-foreground">$ 350.00</span>
+            <span className="text-lg font-bold text-foreground">$ 0.00</span>
             <span className="text-[10px] text-muted-foreground">Pendiente</span>
           </CardContent>
         </Card>
@@ -86,7 +93,7 @@ export default async function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Semillas</span>
             </div>
-            <span className="text-lg font-bold text-foreground">3</span>
+            <span className="text-lg font-bold text-foreground">{activeSeedsCount}</span>
             <span className="text-[10px] text-muted-foreground">En crecimiento</span>
           </CardContent>
         </Card>
@@ -94,31 +101,33 @@ export default async function HomePage() {
 
       {/* Accesos Rápidos (Botones rápidos adicionales) */}
       <div className="grid grid-cols-4 gap-2 mt-2">
-        <Link href="/register-tx?type=INCOME" className="flex flex-col items-center gap-2">
+        <Link href="/register-tx?type=INCOME" prefetch={true} className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-success/10 text-success flex items-center justify-center">
             <ArrowUpIcon className="w-5 h-5" />
           </div>
           <span className="text-[10px] font-medium">Ingreso</span>
         </Link>
-        <Link href="/register-tx?type=EXPENSE" className="flex flex-col items-center gap-2">
+        <Link href="/register-tx?type=EXPENSE" prefetch={true} className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-destructive/10 text-destructive flex items-center justify-center">
             <ArrowDownIcon className="w-5 h-5" />
           </div>
           <span className="text-[10px] font-medium">Gasto</span>
         </Link>
-        <Link href="/seeds" className="flex flex-col items-center gap-2">
+        <Link href="/seeds" prefetch={true} className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-secondary/20 text-secondary-foreground flex items-center justify-center">
             <Droplet className="w-5 h-5" />
           </div>
           <span className="text-[10px] font-medium">Regar</span>
         </Link>
-        <Link href="/tithe" className="flex flex-col items-center gap-2">
+        <Link href="/tithe" prefetch={true} className="flex flex-col items-center gap-2">
           <div className="w-12 h-12 rounded-full bg-gold/10 text-gold flex items-center justify-center">
             <HandHeart className="w-5 h-5" />
           </div>
           <span className="text-[10px] font-medium">Diezmo</span>
         </Link>
       </div>
+
+      <DailyVerseCard />
 
       {/* Últimos Movimientos */}
       <div className="mt-4">
@@ -128,34 +137,27 @@ export default async function HomePage() {
         </div>
         
         <div className="flex flex-col gap-3">
-          {/* Placeholder para transacciones */}
-          <div className="flex items-center justify-between p-4 rounded-3xl bg-card border border-border/50 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
-                🛒
+          {transactions.length === 0 && (
+            <p className="text-sm text-muted-foreground text-center py-4">No hay movimientos recientes.</p>
+          )}
+          {transactions.map(tx => (
+            <div key={tx.id} className="flex items-center justify-between p-4 rounded-3xl bg-card border border-border/50 shadow-sm">
+              <div className="flex items-center gap-4">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'INCOME' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
+                  {tx.type === 'INCOME' ? '💼' : '🛒'}
+                </div>
+                <div>
+                  <p className="font-medium text-sm text-foreground">{tx.notes || (tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}</p>
+                  <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-sm text-foreground">Supermercado</p>
-                <p className="text-xs text-muted-foreground">Hoy</p>
-              </div>
+              <span className={`font-semibold ${tx.type === 'INCOME' ? 'text-success' : 'text-destructive'}`}>
+                {tx.type === 'INCOME' ? '+' : '-'} $ {tx.amount.toFixed(2)}
+              </span>
             </div>
-            <span className="font-semibold text-destructive">- $ 120.00</span>
-          </div>
-
-          <div className="flex items-center justify-between p-4 rounded-3xl bg-card border border-border/50 shadow-sm">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 rounded-full bg-success/10 flex items-center justify-center text-success">
-                💼
-              </div>
-              <div>
-                <p className="font-medium text-sm text-foreground">Honorarios</p>
-                <p className="text-xs text-muted-foreground">Ayer</p>
-              </div>
-            </div>
-            <span className="font-semibold text-success">+ $ 800.00</span>
-          </div>
+          ))}
         </div>
       </div>
     </div>
-  )
+  );
 }

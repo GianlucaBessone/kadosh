@@ -1,28 +1,51 @@
+'use client';
+
 import { ArrowLeft, Droplet, Sprout } from 'lucide-react'
 import Link from 'next/link'
-import { redirect } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
-import prisma from '@/lib/prisma'
-import { getAuthUser } from '@/features/auth/user'
-import { waterSeed, harvestSeed } from '@/features/seeds/actions'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/lib/db'
+import { SeedService } from '@/services/seedService'
+import { use } from 'react';
 
-export default async function SeedDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params
-  const user = await getAuthUser()
-  if (!user) redirect('/login')
+export default function SeedDetailPage() {
+  const params = useParams();
+  const id = params.id as string;
+  const router = useRouter();
 
-  const seed = await prisma.seedGoal.findUnique({
-    where: { id: id, userId: user.id }
-  })
+  const seed = useLiveQuery(() => db.seedGoals.get(id));
 
-  if (!seed) redirect('/seeds')
+  if (seed === undefined) {
+    return <div className="flex h-screen items-center justify-center text-muted-foreground">Cargando semilla...</div>;
+  }
+
+  if (seed === null) {
+    router.replace('/seeds');
+    return null;
+  }
 
   const progress = Math.min(100, Math.round((seed.currentAmount / seed.targetAmount) * 100))
   const isHarvested = seed.status === 'HARVESTED'
   const isReady = progress >= 100 && !isHarvested
+
+  const handleWater = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const amount = parseFloat(formData.get('amount') as string);
+    if (!isNaN(amount) && amount > 0) {
+      await SeedService.waterSeed(seed.id, amount);
+      e.currentTarget.reset();
+    }
+  }
+
+  const handleHarvest = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    await SeedService.harvestSeed(seed.id);
+  }
 
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -58,8 +81,7 @@ export default async function SeedDetailPage({ params }: { params: Promise<{ id:
           <CardContent className="p-6">
             
             {isReady ? (
-              <form action={harvestSeed} className="flex flex-col gap-4 items-center">
-                <input type="hidden" name="seedGoalId" value={seed.id} />
+              <form onSubmit={handleHarvest} className="flex flex-col gap-4 items-center">
                 <div className="w-16 h-16 bg-gold/20 text-gold rounded-full flex items-center justify-center mb-2">
                   <Sprout className="w-8 h-8" />
                 </div>
@@ -72,9 +94,7 @@ export default async function SeedDetailPage({ params }: { params: Promise<{ id:
                 </Button>
               </form>
             ) : (
-              <form action={waterSeed} className="flex flex-col gap-4">
-                <input type="hidden" name="seedGoalId" value={seed.id} />
-                
+              <form onSubmit={handleWater} className="flex flex-col gap-4">
                 <h3 className="font-semibold text-foreground flex items-center gap-2">
                   <Droplet className="w-4 h-4 text-primary" /> Regar semilla
                 </h3>

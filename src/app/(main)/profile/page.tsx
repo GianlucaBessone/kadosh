@@ -1,11 +1,24 @@
-import { User, Settings, Moon, Bell, Download, LogOut, BookOpen } from 'lucide-react'
-import { Card, CardContent } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
-import { logout } from '@/features/auth/actions'
+'use client';
+
+import { User, Settings, Moon, Bell, Download, LogOut, BookOpen } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { lockApp } from '@/features/auth/localAuth';
+import { useRouter } from 'next/navigation';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 
 export default function ProfilePage() {
+  const router = useRouter();
+  const user = useLiveQuery(() => db.users.orderBy('id').first());
+  const settings = useLiveQuery(() => db.settings.orderBy('id').first());
+
+  const handleLogout = () => {
+    lockApp();
+    router.replace('/');
+  };
+
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       
@@ -14,8 +27,12 @@ export default function ProfilePage() {
           <User className="w-8 h-8" />
         </div>
         <div className="flex flex-col">
-          <h1 className="text-xl font-semibold tracking-tight text-foreground">Gianluca</h1>
-          <p className="text-sm text-muted-foreground">gianluca@correo.com</p>
+          <h1 className="text-xl font-semibold tracking-tight text-foreground">
+            {user?.name || 'Usuario'}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {user?.email || 'Sin correo asociado'}
+          </p>
         </div>
       </div>
 
@@ -46,8 +63,84 @@ export default function ProfilePage() {
                 <div className="bg-primary/10 p-2 rounded-full text-primary"><BookOpen className="w-4 h-4" /></div>
                 <Label htmlFor="daily-verse" className="text-sm font-medium">Versículo Diario</Label>
               </div>
-              <Switch id="daily-verse" defaultChecked />
+              <Switch 
+                id="daily-verse" 
+                checked={settings?.dailyVerse ?? true}
+                onCheckedChange={async (checked) => {
+                  if (settings) {
+                    await db.settings.update(settings.id, { dailyVerse: checked });
+                  } else if (user) {
+                    await db.settings.add({
+                      id: crypto.randomUUID(),
+                      userId: user.id,
+                      theme: 'light',
+                      notifications: true,
+                      dailyVerse: checked,
+                      showReflection: true,
+                      offlineDownload: true,
+                      createdAt: new Date().toISOString(),
+                      updatedAt: new Date().toISOString(),
+                      deletedAt: null
+                    });
+                  }
+                }} 
+              />
             </div>
+
+            {(settings?.dailyVerse ?? true) && (
+              <>
+                <div className="flex items-center justify-between p-4 pl-12 bg-muted/30">
+                  <Label htmlFor="show-reflection" className="text-sm">Mostrar reflexión</Label>
+                  <Switch 
+                    id="show-reflection" 
+                    checked={settings?.showReflection ?? true}
+                    onCheckedChange={async (checked) => {
+                      if (settings) {
+                        await db.settings.update(settings.id, { showReflection: checked });
+                      } else if (user) {
+                        await db.settings.add({
+                          id: crypto.randomUUID(),
+                          userId: user.id,
+                          theme: 'light',
+                          notifications: true,
+                          dailyVerse: true,
+                          showReflection: checked,
+                          offlineDownload: true,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                          deletedAt: null
+                        });
+                      }
+                    }} 
+                  />
+                </div>
+                <div className="flex items-center justify-between p-4 pl-12 bg-muted/30">
+                  <Label htmlFor="offline-download" className="text-sm">Descargar automáticamente (Offline)</Label>
+                  <Switch 
+                    id="offline-download" 
+                    checked={settings?.offlineDownload ?? true}
+                    onCheckedChange={async (checked) => {
+                      if (settings) {
+                        await db.settings.update(settings.id, { offlineDownload: checked });
+                      } else if (user) {
+                        await db.settings.add({
+                          id: crypto.randomUUID(),
+                          userId: user.id,
+                          theme: 'light',
+                          notifications: true,
+                          dailyVerse: true,
+                          showReflection: true,
+                          offlineDownload: checked,
+                          createdAt: new Date().toISOString(),
+                          updatedAt: new Date().toISOString(),
+                          deletedAt: null
+                        });
+                      }
+                    }} 
+                  />
+                </div>
+              </>
+            )}
             
           </CardContent>
         </Card>
@@ -66,19 +159,20 @@ export default function ProfilePage() {
               </div>
             </button>
 
-            <form action={logout}>
-              <button type="submit" className="w-full flex items-center justify-between p-4 hover:bg-destructive/5 transition-colors text-left">
-                <div className="flex items-center gap-3 text-destructive">
-                  <div className="bg-destructive/10 p-2 rounded-full"><LogOut className="w-4 h-4" /></div>
-                  <span className="text-sm font-medium">Cerrar Sesión</span>
-                </div>
-              </button>
-            </form>
+            <button 
+              onClick={handleLogout} 
+              className="w-full flex items-center justify-between p-4 hover:bg-destructive/5 transition-colors text-left"
+            >
+              <div className="flex items-center gap-3 text-destructive">
+                <div className="bg-destructive/10 p-2 rounded-full"><LogOut className="w-4 h-4" /></div>
+                <span className="text-sm font-medium">Cerrar Sesión</span>
+              </div>
+            </button>
             
           </CardContent>
         </Card>
       </div>
 
     </div>
-  )
+  );
 }

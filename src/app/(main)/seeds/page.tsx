@@ -1,21 +1,15 @@
+'use client';
+
 import { Plus, Droplet } from 'lucide-react'
 import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
-import prisma from '@/lib/prisma'
-import { SeedGoal } from '@prisma/client'
-import { getAuthUser } from '@/features/auth/user'
-import { redirect } from 'next/navigation'
+import { useLiveQuery } from 'dexie-react-hooks'
+import { db } from '@/lib/db'
 
-export default async function SeedsPage() {
-  const user = await getAuthUser()
-  if (!user) redirect('/login')
-
-  const seeds = await prisma.seedGoal.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: 'desc' }
-  })
+export default function SeedsPage() {
+  const seeds = useLiveQuery(() => db.seedGoals.orderBy('createdAt').reverse().toArray()) || [];
 
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -40,13 +34,13 @@ export default async function SeedsPage() {
           </div>
         )}
 
-        {seeds.map((seed: SeedGoal) => {
+        {seeds.map((seed) => {
           const progress = Math.min(100, Math.round((seed.currentAmount / seed.targetAmount) * 100))
           const isHarvested = seed.status === 'HARVESTED'
           const isReady = progress >= 100 && !isHarvested
 
           return (
-            <Link href={`/seeds/${seed.id}`} key={seed.id}>
+            <Link href={`/seeds/${seed.id}`} key={seed.id} prefetch={true}>
               <Card className={`rounded-3xl border-border/50 shadow-sm overflow-hidden relative group hover:shadow-md transition-all ${isReady ? 'border-gold/30 bg-gold/5' : ''}`}>
                 <div 
                   className={`absolute top-0 left-0 h-1 transition-all duration-1000 ease-in-out ${isReady ? 'bg-gold' : 'bg-secondary'}`}
