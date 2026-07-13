@@ -195,7 +195,7 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
                 </div>
 
                 {/* CENTER AREA: Text */}
-                <div className="flex flex-col items-center justify-center flex-1 w-full max-w-4xl z-10 gap-16 px-8">
+                <div className="flex flex-col items-center justify-center flex-1 w-full max-w-4xl z-10 gap-24 px-8">
                   <blockquote className={`text-[3.8rem] leading-snug text-center ${design === 'classic' ? 'font-serif' : 'font-medium'} ${design === 'bold' ? 'font-bold' : ''}`}>
                     &quot;{verse.text}&quot;
                   </blockquote>
@@ -205,14 +205,14 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
                 </div>
 
                 {/* BOTTOM AREA: Minimal Footer */}
-                <div className="flex flex-col items-center justify-center gap-4 opacity-60 z-10 w-full pb-20">
-                  <div className="flex items-center gap-5">
-                    <div className="w-16 h-16 rounded-full border-[4px] border-current flex items-center justify-center font-bold text-3xl">
+                <div className="flex flex-col items-center justify-center gap-6 opacity-60 z-10 w-full pb-24">
+                  <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 rounded-full border-[6px] border-current flex items-center justify-center font-bold text-5xl">
                       K
                     </div>
-                    <span className="text-3xl font-bold tracking-[0.25em] uppercase">Kadosh</span>
+                    <span className="text-5xl font-bold tracking-[0.25em] uppercase">Kadosh</span>
                   </div>
-                  <span className="text-2xl font-medium italic opacity-80">finanzas con propósito</span>
+                  <span className="text-3xl font-medium italic opacity-80">finanzas con propósito</span>
                 </div>
 
               </div>

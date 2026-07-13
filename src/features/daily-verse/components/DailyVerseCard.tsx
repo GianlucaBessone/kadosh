@@ -67,7 +67,7 @@ export function DailyVerseCard() {
             <Share2 className="w-4 h-4" />
           </button>
 
-          <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-4">
             <blockquote className="text-sm font-medium italic text-foreground/90 leading-relaxed text-center px-2">
               &quot;{verse.text}&quot;
             </blockquote>
