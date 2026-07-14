@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { syncEngine } from '@/services/syncEngine';
 import { isAppUnlocked, hasLocalPin } from '@/features/auth/localAuth';
 import { useRouter, usePathname } from 'next/navigation';
@@ -9,6 +9,7 @@ import { db } from '@/lib/db';
 
 import { DailyVerseService } from '@/features/daily-verse/service';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 
 /**
  * Reads the persisted theme from Dexie and applies the `dark` class to
@@ -29,10 +30,10 @@ function ThemeApplier() {
 export function GlobalClientProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [isMounted, setIsMounted] = useState(false);
+  const isMounted = useRef(false);
 
   useEffect(() => {
-    setIsMounted(true);
+    isMounted.current = true;
 
     // Start the offline sync engine
     syncEngine.start();
@@ -46,7 +47,7 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
   }, []);
 
   useEffect(() => {
-    if (!isMounted) return;
+    if (!isMounted.current) return;
 
     // PIN Authentication guard
     const inAuthRoute = pathname === '/';
@@ -63,14 +64,15 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
         router.replace('/home');
       }
     }
-  }, [pathname, isMounted, router]);
+  }, [pathname, router]);
 
   // Don't render children until we've verified auth on the client to prevent flickering
-  if (!isMounted) return null;
+  if (typeof window === 'undefined') return null;
 
   return (
     <TooltipProvider>
       <ThemeApplier />
+      <OnboardingModal />
       {children}
     </TooltipProvider>
   );
