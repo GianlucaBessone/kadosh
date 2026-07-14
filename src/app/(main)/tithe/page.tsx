@@ -11,6 +11,7 @@ import { db } from '@/lib/db'
 import { TitheService } from '@/services/titheService'
 import { useState, useEffect } from 'react'
 import { formatMoney } from '@/lib/utils'
+import { MoneyInput } from '@/components/ui/MoneyInput'
 
 export default function TithePage() {
   const [loading, setLoading] = useState(false);
@@ -95,8 +96,10 @@ export default function TithePage() {
     const form = e.currentTarget;
     try {
       const formData = new FormData(form);
-      const amount = parseFloat(formData.get('amount') as string);
-      const notes = formData.get('notes') as string || null;
+      const amountStr = formData.get('amount');
+      const notesStr = formData.get('notes');
+      const amount = typeof amountStr === 'string' ? parseFloat(amountStr) : NaN;
+      const notes = typeof notesStr === 'string' ? notesStr : null;
 
       if (isNaN(amount) || amount <= 0 || !user) return;
 
@@ -187,14 +190,13 @@ export default function TithePage() {
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-muted-foreground">Monto fijo mensual</label>
                       <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
-                        <Input 
-                          type="number" 
-                          value={tempAmt}
-                          onChange={(e) => setTempAmt(e.target.value)}
-                          className="h-12 pl-8 rounded-2xl font-medium"
-                          min="0"
-                          step="0.01"
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground z-10">$</span>
+                        <MoneyInput 
+                          value={tempAmt ? parseFloat(tempAmt) : undefined}
+                          onChange={(val) => setTempAmt(val?.toString() || '')}
+                          baseTextSize="text-sm"
+                          className="flex h-12 w-full rounded-2xl border border-input bg-background px-3 py-1 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-8 font-medium text-left"
+                          placeholder="0,00"
                         />
                       </div>
                     </div>
@@ -224,17 +226,15 @@ export default function TithePage() {
       <form onSubmit={handleRegister} className="flex flex-col gap-4">
         <div className="flex gap-3">
           <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">
               $
             </div>
-            <Input 
+            <MoneyInput 
               name="amount" 
-              type="number" 
-              placeholder="0.00" 
+              placeholder="0,00" 
               required 
-              min="1"
-              step="0.01"
-              className="h-12 pl-8 rounded-2xl bg-card border-border shadow-sm pr-4 focus-visible:ring-primary font-medium"
+              baseTextSize="text-base"
+              className="flex h-12 w-full rounded-2xl border border-input bg-card shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
             />
           </div>
         </div>

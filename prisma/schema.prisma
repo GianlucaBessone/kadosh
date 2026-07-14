@@ -175,3 +175,15 @@ model Notification {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+model NotificationIntent {
+  id              String   @id @default(uuid()) @db.Uuid
+  userHash        String   // OneSignal external_id / user hash
+  title           String
+  message         String
+  targetTimeUtc   DateTime
+  commitmentId    String?  // Reference to local IndexedDB ID, used to deduplicate/cancel
+  sent            Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

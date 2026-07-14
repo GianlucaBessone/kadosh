@@ -1,15 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-import { Leaf } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Leaf, ScanFace, Delete } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { hasLocalPin, setLocalPin, verifyLocalPin, clearLocalAuth } from '@/features/auth/localAuth';
+import { hasLocalPin, setLocalPin, verifyLocalPin, clearLocalAuth, isBiometricsSupported, hasBiometricsEnrolled, setupBiometrics, verifyBiometrics } from '@/features/auth/localAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { login, loginWithGoogle } from '@/features/auth/actions';
 import { db, User, clearAllUserData } from '@/lib/db';
 
-type AuthState = 'LOADING' | 'LOGIN' | 'SETUP_PIN_1' | 'SETUP_PIN_2' | 'SYNC_PROMPT' | 'REMOVE_USER_PIN';
+type AuthState = 'LOADING' | 'LOGIN' | 'SETUP_PIN_1' | 'SETUP_PIN_2' | 'BIOMETRIC_PROMPT' | 'SYNC_PROMPT' | 'REMOVE_USER_PIN';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -23,18 +23,38 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  const [bioSupported, setBioSupported] = useState(false);
+  const [hasBio, setHasBio] = useState(false);
+
   useEffect(() => {
     async function loadData() {
       const u = await db.users.orderBy('id').first();
       if (u) setUser(u);
       
+      const supported = await isBiometricsSupported();
+      setBioSupported(supported);
+      const enrolled = hasBiometricsEnrolled();
+      setHasBio(enrolled);
+
       const isSetup = searchParams.get('setup');
       const newState = (!hasLocalPin() || isSetup === 'true') ? 'SETUP_PIN_1' : 'LOGIN';
       setAuthState(newState);
+
+      // Auto-prompt biometrics if returning user
+      if (newState === 'LOGIN' && enrolled) {
+        setTimeout(() => handleBiometricLogin(), 300);
+      }
     }
     const timer = setTimeout(() => loadData(), 0);
     return () => clearTimeout(timer);
   }, [searchParams]);
+
+  const handleBiometricLogin = async () => {
+    const success = await verifyBiometrics();
+    if (success) {
+      router.replace('/home');
+    }
+  };
 
   const handlePinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -80,7 +100,11 @@ export default function LoginPage() {
         });
       }
 
-      setAuthState('SYNC_PROMPT');
+      if (bioSupported) {
+        setAuthState('BIOMETRIC_PROMPT');
+      } else {
+        setAuthState('SYNC_PROMPT');
+      }
     } else if (authState === 'LOGIN') {
       const isValid = await verifyLocalPin(pin);
       if (isValid) {
@@ -100,6 +124,40 @@ export default function LoginPage() {
       setShowDeleteConfirm(true);
     }
   };
+
+  const handleKeypadPress = useCallback((num: string) => {
+    setError('');
+    if (authState === 'SETUP_PIN_2') {
+      if (pinConfirm.length < 6) setPinConfirm(prev => prev + num);
+    } else {
+      if (pin.length < 6) setPin(prev => prev + num);
+    }
+  }, [authState, pin, pinConfirm]);
+
+  const handleBackspace = useCallback(() => {
+    setError('');
+    if (authState === 'SETUP_PIN_2') {
+      setPinConfirm(prev => prev.slice(0, -1));
+    } else {
+      setPin(prev => prev.slice(0, -1));
+    }
+  }, [authState]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ignorar si el usuario está escribiendo en el input de Nombre/Apellido
+      if (document.activeElement?.tagName === 'INPUT') return;
+
+      if (e.key >= '0' && e.key <= '9') {
+        handleKeypadPress(e.key);
+      } else if (e.key === 'Backspace') {
+        handleBackspace();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [handleKeypadPress, handleBackspace]);
 
   const proceedWithDeletion = async () => {
     setShowDeleteConfirm(false);
@@ -141,6 +199,7 @@ export default function LoginPage() {
             {authState === 'LOGIN' ? (user?.name ? `Hola de nuevo, ${user.name}. Ingresa tu PIN.` : 'Ingresa tu PIN de acceso.') : 
              authState === 'REMOVE_USER_PIN' ? 'Ingresa tu PIN para confirmar la eliminación de tu perfil.' :
              authState === 'SYNC_PROMPT' ? 'Sincronización en la nube' :
+             authState === 'BIOMETRIC_PROMPT' ? 'Acceso rápido' :
              'Configura tu perfil y PIN local.'}
           </p>
         </div>
@@ -172,23 +231,76 @@ export default function LoginPage() {
               </div>
             )}
             
-            <div className="space-y-2">
-              <Input 
-                id="pin" 
-                name="pin" 
-                placeholder={authState === 'SETUP_PIN_2' ? 'Confirma tu PIN' : (authState === 'SETUP_PIN_1' ? 'Crea un PIN (mín. 4)' : '••••')} 
-                type="password" 
-                inputMode="numeric"
-                pattern="[0-9]*"
-                required 
-                maxLength={6}
-                value={authState === 'SETUP_PIN_2' ? pinConfirm : pin}
-                onChange={(e) => authState === 'SETUP_PIN_2' ? setPinConfirm(e.target.value) : setPin(e.target.value)}
-                className="h-14 text-center text-2xl tracking-widest rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary"
-              />
-              {error && <p className="text-sm text-destructive text-center mt-2">{error}</p>}
+            <div className="space-y-6 flex flex-col items-center w-full">
+              <div className="h-6">
+                <p className="text-sm font-medium text-muted-foreground text-center">
+                  {authState === 'SETUP_PIN_2' ? 'Confirma tu PIN' : (authState === 'SETUP_PIN_1' ? 'Crea un PIN (mín. 4)' : '')}
+                </p>
+              </div>
+
+              {/* PIN Dots display */}
+              <div className="flex gap-4 justify-center items-center h-10 w-full px-4">
+                {Array.from({ length: Math.max(4, (authState === 'SETUP_PIN_2' ? pinConfirm : pin).length) }).map((_, i) => {
+                  const currentPin = authState === 'SETUP_PIN_2' ? pinConfirm : pin;
+                  const isFilled = i < currentPin.length;
+                  return (
+                    <div 
+                      key={i} 
+                      className={`w-4 h-4 rounded-full transition-all duration-200 ${isFilled ? 'bg-primary scale-110' : 'bg-muted-foreground/20'}`}
+                    />
+                  );
+                })}
+              </div>
+
+              {error && <p className="text-sm text-destructive text-center">{error}</p>}
+
+              {/* Custom Numeric Keypad */}
+              <div className="w-full max-w-[280px] mx-auto grid grid-cols-3 gap-y-4 gap-x-6 mt-4">
+                {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((num) => (
+                  <button
+                    key={num}
+                    type="button"
+                    onClick={() => handleKeypadPress(num)}
+                    className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-3xl font-medium bg-secondary/30 hover:bg-secondary active:scale-95 transition-all text-foreground"
+                  >
+                    {num}
+                  </button>
+                ))}
+                
+                {/* Bottom row: Bio, 0, Backspace */}
+                <div className="flex items-center justify-center">
+                  {authState === 'LOGIN' && hasBio ? (
+                    <button
+                      type="button"
+                      onClick={handleBiometricLogin}
+                      className="w-16 h-16 mx-auto rounded-full flex items-center justify-center bg-secondary/20 hover:bg-secondary text-primary transition-all active:scale-95"
+                    >
+                      <ScanFace className="w-8 h-8" />
+                    </button>
+                  ) : <div className="w-16 h-16" />}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleKeypadPress('0')}
+                  className="w-16 h-16 mx-auto rounded-full flex items-center justify-center text-3xl font-medium bg-secondary/30 hover:bg-secondary active:scale-95 transition-all text-foreground"
+                >
+                  0
+                </button>
+
+                <div className="flex items-center justify-center">
+                  <button
+                    type="button"
+                    onClick={handleBackspace}
+                    className="w-16 h-16 mx-auto rounded-full flex items-center justify-center bg-secondary/20 hover:bg-secondary text-muted-foreground transition-all active:scale-95"
+                  >
+                    <Delete className="w-7 h-7" />
+                  </button>
+                </div>
+              </div>
+
             </div>
-            <Button className="w-full h-12 rounded-full mt-2 shadow-sm font-medium" type="submit" variant={authState === 'REMOVE_USER_PIN' ? 'destructive' : 'default'}>
+            <Button className="w-full h-14 rounded-full mt-6 shadow-sm font-semibold text-lg" type="submit" variant={authState === 'REMOVE_USER_PIN' ? 'destructive' : 'default'}>
               {authState === 'LOGIN' ? 'Ingresar' : 
                authState === 'REMOVE_USER_PIN' ? 'Eliminar Perfil' : 'Continuar'}
             </Button>
@@ -209,6 +321,42 @@ export default function LoginPage() {
                Cancelar
              </button>
            </div>
+        )}
+
+        {authState === 'BIOMETRIC_PROMPT' && (
+          <div className="flex flex-col gap-6 items-center text-center">
+            <div className="w-24 h-24 bg-primary/10 rounded-full flex items-center justify-center mb-2">
+              <ScanFace className="w-12 h-12 text-primary" />
+            </div>
+            <p className="text-foreground text-lg font-medium">
+              ¿Deseas habilitar el acceso con tu rostro o huella digital?
+            </p>
+            <p className="text-muted-foreground text-sm px-4">
+              Podrás desbloquear la aplicación de manera instantánea y segura sin escribir tu PIN.
+            </p>
+            
+            <div className="w-full flex flex-col gap-3 mt-4">
+              <Button 
+                className="w-full rounded-full h-14 text-base font-medium"
+                onClick={async () => {
+                  const success = await setupBiometrics();
+                  if (success) {
+                    setHasBio(true);
+                  }
+                  setAuthState('SYNC_PROMPT');
+                }}
+              >
+                Habilitar Biometría
+              </Button>
+              <Button 
+                variant="ghost" 
+                className="w-full rounded-full h-14 text-base font-medium text-muted-foreground"
+                onClick={() => setAuthState('SYNC_PROMPT')}
+              >
+                Quizás más tarde
+              </Button>
+            </div>
+          </div>
         )}
 
         {authState === 'SYNC_PROMPT' && (

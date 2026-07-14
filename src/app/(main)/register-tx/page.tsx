@@ -8,14 +8,21 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft, ShoppingCart, Home, Car, Utensils, Pill, BookOpen, Film, Lightbulb, Shirt, Package, Briefcase, Laptop, Gift, TrendingUp, Building2 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { TransactionService } from '@/services/transactionService';
 import { db } from '@/lib/db';
+import { MoneyInput } from '@/components/ui/MoneyInput';
 
 export default function RegisterTransactionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setIsMounted(true);
+  }, []);
   
   const typeParam = searchParams.get('type');
   const defaultTab = typeParam === 'INCOME' ? 'income' : 'expense';
@@ -78,8 +85,10 @@ export default function RegisterTransactionPage() {
     }
   };
 
+  if (!isMounted) return null;
+
   return (
-    <div className="flex flex-col gap-6 w-full animate-in fade-in zoom-in duration-500 pb-8">
+    <div className="flex flex-col min-h-screen bg-background animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       
       <div className="flex items-center gap-4 mb-2">
         <Link href="/home" className="text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2">
@@ -100,18 +109,16 @@ export default function RegisterTransactionPage() {
           <form className="flex flex-col gap-6" onSubmit={(e) => handleSubmit(e, 'EXPENSE')}>
             
             {/* Monto Grande */}
-            <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm">
+            <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm px-4">
               <span className="text-sm text-muted-foreground uppercase font-medium tracking-wider mb-2">Monto</span>
-              <div className="flex items-center text-4xl font-bold text-destructive">
+              <div className="flex items-center text-4xl font-bold text-destructive w-full justify-center">
                 <span className="mr-2 text-2xl opacity-50">$</span>
-                <input 
-                  type="number" 
+                <MoneyInput 
                   name="amount"
-                  step="0.01"
                   autoFocus
-                  placeholder="0.00" 
+                  placeholder="0,00" 
                   required
-                  className="bg-transparent border-none outline-none w-32 text-center text-foreground placeholder:text-muted-foreground/30"
+                  baseTextSize="text-4xl"
                 />
               </div>
             </div>
@@ -168,17 +175,15 @@ export default function RegisterTransactionPage() {
         {/* INGRESO */}
         <TabsContent value="income" className="mt-6 space-y-6">
           <form className="flex flex-col gap-6" onSubmit={(e) => handleSubmit(e, 'INCOME')}>
-            <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm">
+            <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm px-4">
               <span className="text-sm text-muted-foreground uppercase font-medium tracking-wider mb-2">Monto</span>
-              <div className="flex items-center text-4xl font-bold text-success">
+              <div className="flex items-center text-4xl font-bold text-success w-full justify-center">
                 <span className="mr-2 text-2xl opacity-50">$</span>
-                <input 
-                  type="number" 
+                <MoneyInput 
                   name="amount"
-                  step="0.01"
+                  placeholder="0,00" 
                   required
-                  placeholder="0.00" 
-                  className="bg-transparent border-none outline-none w-32 text-center text-foreground placeholder:text-muted-foreground/30"
+                  baseTextSize="text-4xl"
                 />
               </div>
             </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { syncEngine } from '@/services/syncEngine';
 import { isAppUnlocked, hasLocalPin } from '@/features/auth/localAuth';
 import { useRouter, usePathname } from 'next/navigation';
@@ -31,6 +31,7 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
   const router = useRouter();
   const pathname = usePathname();
   const isMounted = useRef(false);
+  const [isAuthVerified, setIsAuthVerified] = useState(false);
 
   useEffect(() => {
     isMounted.current = true;
@@ -57,17 +58,21 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
         router.replace('/?setup=true');
       } else if (!isAppUnlocked()) {
         router.replace('/');
+      } else {
+        setIsAuthVerified(true);
       }
     } else {
       // If we are in the auth route but already unlocked, redirect to home
       if (hasLocalPin() && isAppUnlocked()) {
         router.replace('/home');
+      } else {
+        setIsAuthVerified(true);
       }
     }
   }, [pathname, router]);
 
   // Don't render children until we've verified auth on the client to prevent flickering
-  if (typeof window === 'undefined') return null;
+  if (typeof window === 'undefined' || !isAuthVerified) return null;
 
   return (
     <TooltipProvider>

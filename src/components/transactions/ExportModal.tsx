@@ -41,11 +41,16 @@ interface ExportModalProps {
 }
 
 export function ExportModal({ onClose }: ExportModalProps) {
-  const [advFilters, setAdvFilters] = useState({
+  const [advFilters, setAdvFilters] = useState<{
+    dateFrom: string;
+    dateTo: string;
+    types: string[];
+    categories: string[];
+  }>({
     dateFrom: '',
     dateTo: '',
-    types: [] as string[],
-    categories: [] as string[]
+    types: [],
+    categories: []
   });
   const [isExporting, setIsExporting] = useState(false);
   const [quickReportMode, setQuickReportMode] = useState<QuickReportMode>(null);
