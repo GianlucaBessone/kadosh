@@ -1,5 +1,37 @@
 import Dexie, { type EntityTable } from 'dexie';
 
+// ─── Planning Module Enums ───────────────────────────────────────────────────
+
+export enum CommitmentType {
+  INSTALLMENT = 'INSTALLMENT',
+  SUBSCRIPTION = 'SUBSCRIPTION',
+  SERVICE = 'SERVICE',
+  LOAN = 'LOAN',
+  TAX = 'TAX',
+  RENT = 'RENT',
+  INSURANCE = 'INSURANCE',
+  UTILITY = 'UTILITY',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum CommitmentPeriodicity {
+  DAILY = 'DAILY',
+  WEEKLY = 'WEEKLY',
+  MONTHLY = 'MONTHLY',
+  BIMONTHLY = 'BIMONTHLY',
+  QUARTERLY = 'QUARTERLY',
+  SEMIANNUAL = 'SEMIANNUAL',
+  YEARLY = 'YEARLY',
+  CUSTOM = 'CUSTOM',
+}
+
+export enum CommitmentStatus {
+  ACTIVE = 'ACTIVE',
+  PAUSED = 'PAUSED',
+  COMPLETED = 'COMPLETED',
+  CANCELLED = 'CANCELLED',
+}
+
 export interface User {
   id: string;
   email: string;
@@ -129,6 +161,61 @@ export interface DailyVerse {
   deletedAt: string | null;
 }
 
+// ─── Planning Module Interfaces ─────────────────────────────────────────────
+
+export interface FinancialCommitment {
+  id: string;
+  ownerId: string;
+  name: string;
+  description: string | null;
+  categoryId: string | null;
+  type: CommitmentType;
+  status: CommitmentStatus;
+  /** Monto total del compromiso. null si es recurrente indefinido */
+  amountTotal: number | null;
+  /** Valor de cada cuota/pago */
+  installmentAmount: number;
+  /** Cantidad de cuotas. null = recurrente indefinido */
+  installments: number | null;
+  /** Índice de la cuota actual (0-based) */
+  currentInstallment: number;
+  /** Monto restante. null si es recurrente */
+  remainingAmount: number | null;
+  periodicity: CommitmentPeriodicity;
+  /** Fecha de la primera cuota (ISO date) */
+  firstDueDate: string;
+  /** Día del mes para periodicidad mensual */
+  dayOfMonth: number | null;
+  hasReminder: boolean;
+  /** Días de anticipación para el recordatorio */
+  reminderDaysBefore: number;
+  /** Hora del recordatorio (formato HH:mm, ej. '08:00') */
+  reminderTime?: string;
+  /** ID del intento de notificación en Supabase para poder cancelarlo */
+  notificationIntentId?: string | null;
+  /** true = sin cuotas finitas, hasta que el usuario lo finalice */
+  isRecurring: boolean;
+  endDate: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface CommitmentPayment {
+  id: string;
+  commitmentId: string;
+  installmentNumber: number;
+  amount: number;
+  date: string;
+  notes: string | null;
+  /** ID del movimiento financiero creado automáticamente */
+  transactionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
 export interface Notification {
   id: string;
   userId: string;
@@ -172,9 +259,27 @@ export class KadoshDB extends Dexie {
   notifications!: EntityTable<Notification, 'id'>;
   syncQueue!: EntityTable<SyncQueue, 'id'>;
   metadata!: EntityTable<Metadata, 'id'>;
+  financialCommitments!: EntityTable<FinancialCommitment, 'id'>;
+  commitmentPayments!: EntityTable<CommitmentPayment, 'id'>;
 
   constructor() {
     super('KadoshDB');
+    this.version(6).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      accounts: 'id, userId',
+      categories: 'id, userId, type',
+      transactions: 'id, userId, accountId, categoryId, type, date',
+      seedGoals: 'id, userId, status, createdAt',
+      seedContributions: 'id, seedGoalId, date',
+      tithes: 'id, userId, [month+year], createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      financialCommitments: 'id, ownerId, status, type, dayOfMonth, firstDueDate',
+      commitmentPayments: 'id, commitmentId, date, installmentNumber',
+    });
     this.version(5).stores({
       users: 'id, email, isCloudLinked',
       settings: 'id, userId',
@@ -254,7 +359,7 @@ export async function clearAllUserData() {
   await db.transaction('rw', [
     db.users, db.settings, db.accounts, db.categories, db.transactions,
     db.seedGoals, db.seedContributions, db.tithes, db.notifications,
-    db.syncQueue, db.metadata
+    db.syncQueue, db.metadata, db.financialCommitments, db.commitmentPayments
   ], async () => {
     await db.users.clear();
     await db.settings.clear();
@@ -267,5 +372,7 @@ export async function clearAllUserData() {
     await db.notifications.clear();
     await db.syncQueue.clear();
     await db.metadata.clear();
+    await db.financialCommitments.clear();
+    await db.commitmentPayments.clear();
   });
 }

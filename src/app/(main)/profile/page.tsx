@@ -36,7 +36,8 @@ function AvatarSection({ user }: { user: { id: string; name: string | null; avat
     setLoading(true);
     const reader = new FileReader();
     reader.onload = async () => {
-      const base64 = reader.result as string;
+      if (typeof reader.result !== 'string') return;
+      const base64 = reader.result;
       await db.users.update(user.id, {
         avatarUrl: base64,
         updatedAt: new Date().toISOString(),

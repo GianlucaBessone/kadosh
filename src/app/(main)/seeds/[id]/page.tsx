@@ -11,11 +11,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { SeedService } from '@/services/seedService'
-import { formatMoney } from '@/lib/utils'
+import { formatMoney, cn } from '@/lib/utils'
+import { MoneyInput } from '@/components/ui/MoneyInput'
 
 export default function SeedDetailPage() {
-  const params = useParams();
-  const id = params.id as string;
+  const params = useParams<{ id: string }>();
+  const id = params?.id || '';
   const router = useRouter();
 
   const seed = useLiveQuery(() => db.seedGoals.get(id));
@@ -46,7 +47,9 @@ export default function SeedDetailPage() {
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const amount = parseFloat(formData.get('amount') as string);
+    const amountStr = formData.get('amount');
+    if (typeof amountStr !== 'string') return;
+    const amount = parseFloat(amountStr);
     if (!isNaN(amount) && amount > 0) {
       await SeedService.waterSeed(seed.id, amount);
       form.reset();
@@ -57,7 +60,9 @@ export default function SeedDetailPage() {
     e.preventDefault();
     const form = e.currentTarget;
     const formData = new FormData(form);
-    const amount = parseFloat(formData.get('amount') as string);
+    const amountStr = formData.get('amount');
+    if (typeof amountStr !== 'string') return;
+    const amount = parseFloat(amountStr);
     if (!isNaN(amount) && amount > 0 && amount <= seed.currentAmount) {
       await SeedService.withdrawSeed(seed.id, amount);
       form.reset();
@@ -139,15 +144,13 @@ export default function SeedDetailPage() {
                     
                     <div className="flex gap-3">
                       <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground">$</div>
-                        <Input 
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">$</div>
+                        <MoneyInput 
                           name="amount" 
-                          type="number" 
-                          placeholder="0.00" 
+                          placeholder="0,00" 
                           required 
-                          min="1"
-                          step="0.01"
-                          className="h-12 pl-8 rounded-2xl bg-background border-border shadow-sm pr-4 focus-visible:ring-primary font-medium"
+                          baseTextSize="text-base"
+                          className="flex h-12 w-full rounded-2xl border border-input bg-background shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
                         />
                       </div>
                       <Button type="submit" className="h-12 px-6 rounded-2xl shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
@@ -166,16 +169,13 @@ export default function SeedDetailPage() {
                     
                     <div className="flex gap-3">
                       <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground">$</div>
-                        <Input 
+                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">$</div>
+                        <MoneyInput 
                           name="amount" 
-                          type="number" 
-                          placeholder="0.00" 
+                          placeholder="0,00" 
                           required 
-                          min="1"
-                          max={seed.currentAmount}
-                          step="0.01"
-                          className="h-12 pl-8 rounded-2xl bg-background border-border shadow-sm pr-4 focus-visible:ring-primary font-medium"
+                          baseTextSize="text-base"
+                          className="flex h-12 w-full rounded-2xl border border-input bg-background shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
                         />
                       </div>
                       <Button type="submit" variant="destructive" className="h-12 px-6 rounded-2xl shadow-sm font-medium">

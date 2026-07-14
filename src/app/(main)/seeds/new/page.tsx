@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MoneyInput } from '@/components/ui/MoneyInput'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { SeedService } from '@/services/seedService'
 import { db } from '@/lib/db'
@@ -16,8 +17,11 @@ export default function NewSeedPage() {
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
-    const name = formData.get('name') as string;
-    const targetAmount = parseFloat(formData.get('targetAmount') as string);
+    const nameStr = formData.get('name');
+    const targetAmountStr = formData.get('targetAmount');
+    
+    const name = typeof nameStr === 'string' ? nameStr : '';
+    const targetAmount = typeof targetAmountStr === 'string' ? parseFloat(targetAmountStr) : NaN;
     
     if (name && targetAmount > 0) {
       const user = await db.users.orderBy('id').first();
@@ -69,18 +73,15 @@ export default function NewSeedPage() {
         <div className="space-y-2">
           <Label htmlFor="targetAmount" className="text-xs text-muted-foreground ml-2">Meta a cosechar ($)</Label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground">
+            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">
               $
             </div>
-            <Input 
-              id="targetAmount" 
+            <MoneyInput 
               name="targetAmount" 
-              type="number" 
-              placeholder="0.00" 
+              placeholder="0,00" 
               required 
-              min="1"
-              step="0.01"
-              className="h-14 pl-8 rounded-2xl bg-card border-border shadow-sm pr-4 focus-visible:ring-primary text-base font-semibold"
+              baseTextSize="text-base"
+              className="flex h-14 w-full rounded-2xl border border-input bg-card shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-semibold text-left text-base"
             />
           </div>
         </div>

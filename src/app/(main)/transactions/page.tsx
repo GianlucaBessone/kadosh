@@ -48,11 +48,16 @@ export default function TransactionsPage() {
   
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
-  const [advFilters, setAdvFilters] = useState({
+  const [advFilters, setAdvFilters] = useState<{
+    dateFrom: string;
+    dateTo: string;
+    types: string[];
+    categories: string[];
+  }>({
     dateFrom: '',
     dateTo: '',
-    types: [] as string[],
-    categories: [] as string[]
+    types: [],
+    categories: []
   });
 
   const rawTransactions = useLiveQuery(async () => {

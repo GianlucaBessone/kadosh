@@ -129,7 +129,7 @@ export class SyncEngine {
     const serverTimestamp = data.serverTimestamp;
     
     // Process incoming data (Last Write Wins)
-    await db.transaction('rw', [db.transactions, db.categories, db.accounts, db.seedGoals, db.seedContributions, db.tithes, db.settings, db.notifications], async () => {
+    await db.transaction('rw', [db.transactions, db.categories, db.accounts, db.seedGoals, db.seedContributions, db.tithes, db.settings, db.notifications, db.financialCommitments, db.commitmentPayments], async () => {
       // Transactions
       for (const t of data.transactions || []) {
         const existing = await db.transactions.get(t.id);
@@ -183,6 +183,22 @@ export class SyncEngine {
         const existing = await db.settings.get(s.id);
         if (!existing || new Date(s.updatedAt) > new Date(existing.updatedAt)) {
           await db.settings.put(s);
+        }
+      }
+
+      // Financial Commitments
+      for (const fc of data.financialCommitments || []) {
+        const existing = await db.financialCommitments.get(fc.id);
+        if (!existing || new Date(fc.updatedAt) > new Date(existing.updatedAt)) {
+          await db.financialCommitments.put(fc);
+        }
+      }
+
+      // Commitment Payments
+      for (const cp of data.commitmentPayments || []) {
+        const existing = await db.commitmentPayments.get(cp.id);
+        if (!existing || new Date(cp.updatedAt) > new Date(existing.updatedAt)) {
+          await db.commitmentPayments.put(cp);
         }
       }
     });
