@@ -1,19 +1,41 @@
 'use client';
 
 import { Card, CardContent } from '@/components/ui/card';
-import { ArrowDownIcon, ArrowUpIcon, Droplet, HandHeart } from 'lucide-react';
+import { ArrowDownIcon, ArrowUpIcon, Droplet, HandHeart, Briefcase, ShoppingCart, Sprout } from 'lucide-react';
 import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { DailyVerseCard } from '@/features/daily-verse/components/DailyVerseCard';
+import { formatMoney } from '@/lib/utils';
+import { TransactionCard } from '@/components/transactions/TransactionCard';
 
 export default function HomePage() {
   const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
   const totalBalance = accounts.reduce((acc, account) => acc + account.balance, 0);
 
   // We could also calculate incomes and expenses for the current month.
-  // For simplicity, let's just grab the transactions and sum them up.
-  const transactions = useLiveQuery(() => db.transactions.orderBy('date').reverse().limit(5).toArray()) || [];
+  // Fetch transactions and tithes to show in recent movements
+  const transactions = useLiveQuery(async () => {
+    const txs = await db.transactions.toArray();
+    const tithes = await db.tithes.toArray();
+    
+    const mappedTithes = tithes.map(t => ({
+      id: t.id,
+      userId: t.userId,
+      accountId: '',
+      categoryId: 'tithe',
+      type: 'EXPENSE',
+      amount: t.amount,
+      date: t.date,
+      notes: t.notes || 'Entrega de Diezmo',
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+      deletedAt: t.deletedAt
+    }));
+
+    const all = [...txs, ...mappedTithes];
+    return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
+  }) || [];
   
   // Calculate current month's stats (approximation)
   const currentMonthStart = new Date();
@@ -43,7 +65,7 @@ export default function HomePage() {
       {/* Balance Disponible */}
       <div className="flex flex-col gap-2 items-center justify-center py-6">
         <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Balance Total</span>
-        <h2 className="text-5xl font-bold tracking-tighter text-foreground">$ {totalBalance.toFixed(2)}</h2>
+        <h2 className="text-5xl font-bold tracking-tighter text-foreground">{formatMoney(totalBalance)}</h2>
       </div>
 
       {/* Resumen del Mes */}
@@ -56,7 +78,7 @@ export default function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Ingresos</span>
             </div>
-            <span className="text-lg font-bold text-foreground">$ {incomes.toFixed(2)}</span>
+            <span className="text-lg font-bold text-foreground">{formatMoney(incomes)}</span>
           </CardContent>
         </Card>
         
@@ -68,7 +90,7 @@ export default function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Gastos</span>
             </div>
-            <span className="text-lg font-bold text-foreground">$ {expenses.toFixed(2)}</span>
+            <span className="text-lg font-bold text-foreground">{formatMoney(expenses)}</span>
           </CardContent>
         </Card>
 
@@ -80,7 +102,7 @@ export default function HomePage() {
               </div>
               <span className="text-xs font-semibold uppercase tracking-wider">Diezmo</span>
             </div>
-            <span className="text-lg font-bold text-foreground">$ 0.00</span>
+            <span className="text-lg font-bold text-foreground">{formatMoney(0)}</span>
             <span className="text-[10px] text-muted-foreground">Pendiente</span>
           </CardContent>
         </Card>
@@ -141,20 +163,7 @@ export default function HomePage() {
             <p className="text-sm text-muted-foreground text-center py-4">No hay movimientos recientes.</p>
           )}
           {transactions.map(tx => (
-            <div key={tx.id} className="flex items-center justify-between p-4 rounded-3xl bg-card border border-border/50 shadow-sm">
-              <div className="flex items-center gap-4">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${tx.type === 'INCOME' ? 'bg-success/10 text-success' : 'bg-muted text-muted-foreground'}`}>
-                  {tx.type === 'INCOME' ? '💼' : '🛒'}
-                </div>
-                <div>
-                  <p className="font-medium text-sm text-foreground">{tx.notes || (tx.type === 'INCOME' ? 'Ingreso' : 'Gasto')}</p>
-                  <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <span className={`font-semibold ${tx.type === 'INCOME' ? 'text-success' : 'text-destructive'}`}>
-                {tx.type === 'INCOME' ? '+' : '-'} $ {tx.amount.toFixed(2)}
-              </span>
-            </div>
+            <TransactionCard key={tx.id} tx={tx} />
           ))}
         </div>
       </div>

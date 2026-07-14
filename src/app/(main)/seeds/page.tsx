@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
+import { formatMoney } from '@/lib/utils'
 
 export default function SeedsPage() {
   const seeds = useLiveQuery(() => db.seedGoals.orderBy('createdAt').reverse().toArray()) || [];
@@ -51,12 +52,12 @@ export default function SeedsPage() {
                     <div className="w-16 h-16 rounded-full bg-secondary/10 flex items-center justify-center overflow-hidden">
                       <PlantAvatar progress={progress} className="w-full h-full transform scale-75" />
                     </div>
-                    <div className="flex flex-col">
-                      <h3 className="font-semibold text-lg text-foreground">{seed.name}</h3>
-                      <div className="flex items-baseline gap-1 mt-1">
-                        <span className={`font-bold ${isReady ? 'text-gold' : 'text-foreground'}`}>$ {seed.currentAmount.toFixed(2)}</span>
+                    <div className="flex flex-col min-w-0">
+                      <h3 className="font-semibold text-lg text-foreground truncate">{seed.name}</h3>
+                      <div className="flex items-baseline gap-1 mt-1 flex-wrap">
+                        <span className={`font-bold whitespace-nowrap ${isReady ? 'text-gold' : 'text-foreground'}`}>{formatMoney(seed.currentAmount)}</span>
                         {!isHarvested && (
-                          <span className="text-xs text-muted-foreground">/ $ {seed.targetAmount.toFixed(2)}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">/ {formatMoney(seed.targetAmount)}</span>
                         )}
                         {isHarvested && (
                           <span className="text-xs text-muted-foreground">Cosechada</span>

@@ -1,16 +1,58 @@
 'use client';
 
-import { HandHeart, History } from 'lucide-react'
+import { HandHeart, History, Settings2 } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { TitheService } from '@/services/titheService'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { formatMoney } from '@/lib/utils'
 
 export default function TithePage() {
   const [loading, setLoading] = useState(false);
+  const [customPercentage, setCustomPercentage] = useState<number | null>(null);
+  const [customFixedAmount, setCustomFixedAmount] = useState<number | null>(null);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [tempPct, setTempPct] = useState<string>('10');
+  const [tempAmt, setTempAmt] = useState<string>('');
+
+  useEffect(() => {
+    const savedPct = localStorage.getItem('kadosh_tithe_pct');
+    const savedAmt = localStorage.getItem('kadosh_tithe_amt');
+    if (savedPct) {
+      setCustomPercentage(Number(savedPct));
+      setTempPct(savedPct);
+    }
+    if (savedAmt) {
+      setCustomFixedAmount(Number(savedAmt));
+      setTempAmt(savedAmt);
+    }
+  }, []);
+
+  const handleSaveConfig = (mode: 'pct' | 'amt') => {
+    if (mode === 'pct') {
+      const pct = parseFloat(tempPct);
+      if (!isNaN(pct) && pct > 0) {
+        setCustomPercentage(pct);
+        setCustomFixedAmount(null);
+        localStorage.setItem('kadosh_tithe_pct', pct.toString());
+        localStorage.removeItem('kadosh_tithe_amt');
+      }
+    } else {
+      const amt = parseFloat(tempAmt);
+      if (!isNaN(amt) && amt > 0) {
+        setCustomFixedAmount(amt);
+        setCustomPercentage(null);
+        localStorage.setItem('kadosh_tithe_amt', amt.toString());
+        localStorage.removeItem('kadosh_tithe_pct');
+      }
+    }
+    setIsDialogOpen(false);
+  };
 
   const user = useLiveQuery(() => db.users.orderBy('id').first());
 
@@ -24,7 +66,10 @@ export default function TithePage() {
   ) || [];
 
   const incomes = currentMonthTx.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
-  const suggestedTithe = incomes * 0.1;
+  const actualPercentage = customPercentage ?? 10;
+  const suggestedTithe = customFixedAmount !== null 
+    ? customFixedAmount 
+    : (incomes * (actualPercentage / 100));
 
   // Current month tithes
   const now = new Date();
@@ -47,8 +92,9 @@ export default function TithePage() {
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
+    const form = e.currentTarget;
     try {
-      const formData = new FormData(e.currentTarget);
+      const formData = new FormData(form);
       const amount = parseFloat(formData.get('amount') as string);
       const notes = formData.get('notes') as string || null;
 
@@ -72,7 +118,7 @@ export default function TithePage() {
         });
       }
 
-      e.currentTarget.reset();
+      form.reset();
     } finally {
       setLoading(false);
     }
@@ -94,21 +140,77 @@ export default function TithePage() {
         </div>
         <CardContent className="p-6 relative z-10 flex flex-col gap-4">
           
-          <div className="flex justify-between items-end">
-            <div className="flex flex-col">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-1">Pendiente</span>
-              <span className="text-4xl font-bold text-foreground">$ {pending.toFixed(2)}</span>
+          <div className="flex justify-between items-end gap-2">
+            <div className="flex flex-col min-w-0">
+              <span className="text-[clamp(0.65rem,2.5vw,0.75rem)] font-semibold uppercase tracking-wider text-muted-foreground mb-1 whitespace-nowrap">Pendiente</span>
+              <span className="text-[clamp(1.5rem,7vw,2.25rem)] font-bold text-foreground whitespace-nowrap">{formatMoney(pending)}</span>
             </div>
-            <div className="flex flex-col items-end text-right">
-              <span className="text-xs text-muted-foreground mb-1">Sugerido (10%)</span>
-              <span className="text-lg font-medium text-gold">$ {suggestedTithe.toFixed(2)}</span>
-            </div>
+            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+              <DialogTrigger asChild>
+                <div className="flex flex-col items-end text-right cursor-pointer hover:opacity-80 transition-opacity min-w-0">
+                  <div className="flex items-center gap-1 mb-1 text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground whitespace-nowrap">
+                    <span>Sugerido ({customFixedAmount !== null ? 'Fijo' : `${actualPercentage}%`})</span>
+                    <Settings2 className="w-3 h-3 flex-shrink-0" />
+                  </div>
+                  <span className="text-[clamp(1rem,4.5vw,1.125rem)] font-medium text-gold whitespace-nowrap">{formatMoney(suggestedTithe)}</span>
+                </div>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md rounded-3xl p-6">
+                <DialogHeader>
+                  <DialogTitle className="text-xl">Configurar Diezmo Sugerido</DialogTitle>
+                </DialogHeader>
+                <Tabs defaultValue={customFixedAmount !== null ? 'amt' : 'pct'} className="mt-4">
+                  <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                    <TabsTrigger value="pct" className="rounded-lg">Porcentaje</TabsTrigger>
+                    <TabsTrigger value="amt" className="rounded-lg">Monto Fijo</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="pct" className="space-y-4 mt-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Porcentaje de ingresos</label>
+                      <div className="relative">
+                        <Input 
+                          type="number" 
+                          value={tempPct}
+                          onChange={(e) => setTempPct(e.target.value)}
+                          className="h-12 pl-4 pr-8 rounded-2xl font-medium"
+                          min="0"
+                          step="0.1"
+                        />
+                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                    <Button onClick={() => handleSaveConfig('pct')} className="w-full h-12 rounded-full font-medium bg-gold hover:bg-gold/90 text-gold-foreground">
+                      Guardar Configuración
+                    </Button>
+                  </TabsContent>
+                  <TabsContent value="amt" className="space-y-4 mt-6">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-muted-foreground">Monto fijo mensual</label>
+                      <div className="relative">
+                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground">$</span>
+                        <Input 
+                          type="number" 
+                          value={tempAmt}
+                          onChange={(e) => setTempAmt(e.target.value)}
+                          className="h-12 pl-8 rounded-2xl font-medium"
+                          min="0"
+                          step="0.01"
+                        />
+                      </div>
+                    </div>
+                    <Button onClick={() => handleSaveConfig('amt')} className="w-full h-12 rounded-full font-medium bg-gold hover:bg-gold/90 text-gold-foreground">
+                      Guardar Configuración
+                    </Button>
+                  </TabsContent>
+                </Tabs>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className="space-y-2 mt-2">
-            <div className="flex justify-between text-xs text-muted-foreground">
-              <span>Entregado: $ {totalPaid.toFixed(2)}</span>
-              <span>Ingresos del mes: $ {incomes.toFixed(2)}</span>
+            <div className="flex justify-between text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground gap-2">
+              <span className="whitespace-nowrap truncate">Entregado: {formatMoney(totalPaid)}</span>
+              <span className="whitespace-nowrap truncate">Ingresos: {formatMoney(incomes)}</span>
             </div>
             <div className="h-2 w-full bg-gold/20 rounded-full overflow-hidden">
               <div className="h-full bg-gold rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
@@ -167,7 +269,7 @@ export default function TithePage() {
                   {monthNames[tithe.month - 1]} {tithe.year}
                 </p>
               </div>
-              <span className="font-semibold text-gold">+ $ {tithe.amount.toFixed(2)}</span>
+              <span className="font-semibold text-gold">+ {formatMoney(tithe.amount)}</span>
             </div>
           ))}
         </div>

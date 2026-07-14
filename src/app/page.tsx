@@ -3,28 +3,36 @@
 import { useState, useEffect } from 'react';
 import { Leaf } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { hasLocalPin, setLocalPin, verifyLocalPin } from '@/features/auth/localAuth';
+import { hasLocalPin, setLocalPin, verifyLocalPin, clearLocalAuth } from '@/features/auth/localAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { login, loginWithGoogle } from '@/features/auth/actions';
-import { db } from '@/lib/db';
+import { db, User, clearAllUserData } from '@/lib/db';
 
-type AuthState = 'LOADING' | 'LOGIN' | 'SETUP_PIN_1' | 'SETUP_PIN_2' | 'SYNC_PROMPT';
+type AuthState = 'LOADING' | 'LOGIN' | 'SETUP_PIN_1' | 'SETUP_PIN_2' | 'SYNC_PROMPT' | 'REMOVE_USER_PIN';
 
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authState, setAuthState] = useState<AuthState>('LOADING');
+  const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState('');
   const [lastName, setLastName] = useState('');
   const [pin, setPin] = useState('');
   const [pinConfirm, setPinConfirm] = useState('');
   const [error, setError] = useState('');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   useEffect(() => {
-    const isSetup = searchParams.get('setup');
-    const newState = (!hasLocalPin() || isSetup === 'true') ? 'SETUP_PIN_1' : 'LOGIN';
-    const timer = setTimeout(() => setAuthState(newState), 0);
+    async function loadData() {
+      const u = await db.users.orderBy('id').first();
+      if (u) setUser(u);
+      
+      const isSetup = searchParams.get('setup');
+      const newState = (!hasLocalPin() || isSetup === 'true') ? 'SETUP_PIN_1' : 'LOGIN';
+      setAuthState(newState);
+    }
+    const timer = setTimeout(() => loadData(), 0);
     return () => clearTimeout(timer);
   }, [searchParams]);
 
@@ -49,14 +57,16 @@ export default function LoginPage() {
       await setLocalPin(pin);
       
       // Crear perfil local inicial
-      const user = await db.users.orderBy('id').first();
-      if (!user) {
+      const localUser = await db.users.orderBy('id').first();
+      if (!localUser) {
         const userId = crypto.randomUUID();
         await db.users.add({
           id: userId,
           email: '',
           name: name || 'Usuario',
           lastName: lastName || '',
+          avatarUrl: null,
+          isCloudLinked: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           deletedAt: null
@@ -79,7 +89,40 @@ export default function LoginPage() {
         setError('PIN incorrecto');
         setPin('');
       }
+    } else if (authState === 'REMOVE_USER_PIN') {
+      const isValid = await verifyLocalPin(pin);
+      if (!isValid) {
+        setError('PIN incorrecto');
+        setPin('');
+        return;
+      }
+      
+      setShowDeleteConfirm(true);
     }
+  };
+
+  const proceedWithDeletion = async () => {
+    setShowDeleteConfirm(false);
+    setAuthState('LOADING');
+    try {
+      const hasSupabaseSession = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
+      if (hasSupabaseSession || user?.email) {
+        const { syncEngine } = await import('@/services/syncEngine');
+        await syncEngine.sync();
+      }
+    } catch (e) {
+      console.warn('Sync failed before deletion:', e);
+    }
+    
+    await clearAllUserData();
+    clearLocalAuth();
+    
+    setUser(null);
+    setPin('');
+    setPinConfirm('');
+    setName('');
+    setLastName('');
+    setAuthState('SETUP_PIN_1');
   };
 
   if (authState === 'LOADING') {
@@ -95,13 +138,14 @@ export default function LoginPage() {
           </div>
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">KADOSH</h1>
           <p className="text-sm text-muted-foreground mt-2">
-            {authState === 'LOGIN' ? 'Ingresa tu PIN de acceso.' : 
+            {authState === 'LOGIN' ? (user?.name ? `Hola de nuevo, ${user.name}. Ingresa tu PIN.` : 'Ingresa tu PIN de acceso.') : 
+             authState === 'REMOVE_USER_PIN' ? 'Ingresa tu PIN para confirmar la eliminación de tu perfil.' :
              authState === 'SYNC_PROMPT' ? 'Sincronización en la nube' :
              'Configura tu perfil y PIN local.'}
           </p>
         </div>
 
-        {(authState === 'LOGIN' || authState === 'SETUP_PIN_1' || authState === 'SETUP_PIN_2') && (
+        {(authState === 'LOGIN' || authState === 'SETUP_PIN_1' || authState === 'SETUP_PIN_2' || authState === 'REMOVE_USER_PIN') && (
           <form onSubmit={handlePinSubmit} className="flex flex-col gap-4">
             {authState === 'SETUP_PIN_1' && (
               <div className="space-y-2 mb-2 flex gap-2">
@@ -144,10 +188,27 @@ export default function LoginPage() {
               />
               {error && <p className="text-sm text-destructive text-center mt-2">{error}</p>}
             </div>
-            <Button className="w-full h-12 rounded-full mt-2 shadow-sm font-medium" type="submit">
-              {authState === 'LOGIN' ? 'Ingresar' : 'Continuar'}
+            <Button className="w-full h-12 rounded-full mt-2 shadow-sm font-medium" type="submit" variant={authState === 'REMOVE_USER_PIN' ? 'destructive' : 'default'}>
+              {authState === 'LOGIN' ? 'Ingresar' : 
+               authState === 'REMOVE_USER_PIN' ? 'Eliminar Perfil' : 'Continuar'}
             </Button>
           </form>
+        )}
+
+        {authState === 'LOGIN' && user && (
+           <div className="mt-8 flex flex-col items-center gap-3">
+             <button type="button" onClick={() => { setAuthState('REMOVE_USER_PIN'); setPin(''); setError(''); }} className="text-sm font-medium text-muted-foreground hover:text-destructive transition-colors">
+               Cambiar o Quitar usuario
+             </button>
+           </div>
+        )}
+        
+        {authState === 'REMOVE_USER_PIN' && (
+           <div className="mt-4 flex flex-col items-center gap-3">
+             <button type="button" onClick={() => { setAuthState('LOGIN'); setPin(''); setError(''); }} className="text-sm font-medium text-muted-foreground hover:text-primary transition-colors">
+               Cancelar
+             </button>
+           </div>
         )}
 
         {authState === 'SYNC_PROMPT' && (
@@ -190,6 +251,31 @@ export default function LoginPage() {
           </div>
         )}
       </main>
+
+      {/* Modal Nativo de Confirmación */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border shadow-lg rounded-3xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">¿Eliminar Perfil?</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Esta acción es irreversible. Se borrarán todos los datos y registros almacenados localmente.
+              </p>
+              <div className="flex flex-col gap-3">
+                <Button variant="destructive" className="w-full h-12 rounded-full font-medium" onClick={proceedWithDeletion}>
+                  Sí, eliminar todo
+                </Button>
+                <Button variant="outline" className="w-full h-12 rounded-full border-border font-medium" onClick={() => setShowDeleteConfirm(false)}>
+                  Cancelar
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
