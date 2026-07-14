@@ -1,6 +1,6 @@
 'use client';
 
-import { HandHeart, History, Settings2 } from 'lucide-react'
+import { HandHeart, History, Settings2, RotateCcw } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ export default function TithePage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [tempPct, setTempPct] = useState<string>('10');
   const [tempAmt, setTempAmt] = useState<string>('');
+  const [isFlipped, setIsFlipped] = useState(false);
 
   useEffect(() => {
     const savedPct = localStorage.getItem('kadosh_tithe_pct');
@@ -31,6 +32,15 @@ export default function TithePage() {
     if (savedAmt) {
       setCustomFixedAmount(Number(savedAmt));
       setTempAmt(savedAmt);
+    }
+
+    const hasFlipped = sessionStorage.getItem('kadosh_tithe_flipped');
+    if (!hasFlipped) {
+      const timer = setTimeout(() => {
+        setIsFlipped(true);
+        sessionStorage.setItem('kadosh_tithe_flipped', 'true');
+      }, 1000);
+      return () => clearTimeout(timer);
     }
   }, []);
 
@@ -137,90 +147,146 @@ export default function TithePage() {
         <p className="text-sm text-muted-foreground">Honra con tus bienes.</p>
       </div>
 
-      <Card className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm relative overflow-hidden">
-        <div className="absolute -right-8 -top-8 text-gold/10">
-          <HandHeart className="w-48 h-48" />
-        </div>
-        <CardContent className="p-6 relative z-10 flex flex-col gap-4">
-          
-          <div className="flex justify-between items-end gap-2">
-            <div className="flex flex-col min-w-0">
-              <span className="text-[clamp(0.65rem,2.5vw,0.75rem)] font-semibold uppercase tracking-wider text-muted-foreground mb-1 whitespace-nowrap">Pendiente</span>
-              <span className="text-[clamp(1.5rem,7vw,2.25rem)] font-bold text-foreground whitespace-nowrap">{formatMoney(pending)}</span>
+      <div style={{ perspective: '1000px' }} className="w-full relative z-0">
+        <div
+          style={{
+            transformStyle: 'preserve-3d',
+            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+          }}
+          className="relative w-full transition-transform duration-700 ease-in-out"
+        >
+          {/* FRONT SIDE */}
+          <Card 
+            style={{ 
+              backfaceVisibility: 'hidden', 
+              WebkitBackfaceVisibility: 'hidden',
+              pointerEvents: isFlipped ? 'none' : 'auto',
+              transform: 'translateZ(0)'
+            }}
+            className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm relative overflow-hidden w-full pb-2"
+          >
+            <div className="absolute -right-8 -top-8 text-gold/10">
+              <HandHeart className="w-48 h-48" />
             </div>
-            <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-              <DialogTrigger asChild>
-                <div className="flex flex-col items-end text-right cursor-pointer hover:opacity-80 transition-opacity min-w-0">
-                  <div className="flex items-center gap-1 mb-1 text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground whitespace-nowrap">
-                    <span>Sugerido ({customFixedAmount !== null ? 'Fijo' : `${actualPercentage}%`})</span>
-                    <Settings2 className="w-3 h-3 flex-shrink-0" />
-                  </div>
-                  <span className="text-[clamp(1rem,4.5vw,1.125rem)] font-medium text-gold whitespace-nowrap">{formatMoney(suggestedTithe)}</span>
+            <CardContent className="p-6 pb-10 relative z-10 flex flex-col gap-4">
+              
+              <div className="flex justify-between items-end gap-2">
+                <div className="flex flex-col min-w-0">
+                  <span className="text-[clamp(0.65rem,2.5vw,0.75rem)] font-semibold uppercase tracking-wider text-muted-foreground mb-1 whitespace-nowrap">Pendiente</span>
+                  <span className="text-[clamp(1.5rem,7vw,2.25rem)] font-bold text-foreground whitespace-nowrap">{formatMoney(pending)}</span>
                 </div>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md rounded-3xl p-6">
-                <DialogHeader>
-                  <DialogTitle className="text-xl">Configurar Diezmo Sugerido</DialogTitle>
-                </DialogHeader>
-                <Tabs defaultValue={customFixedAmount !== null ? 'amt' : 'pct'} className="mt-4">
-                  <TabsList className="grid w-full grid-cols-2 rounded-xl">
-                    <TabsTrigger value="pct" className="rounded-lg">Porcentaje</TabsTrigger>
-                    <TabsTrigger value="amt" className="rounded-lg">Monto Fijo</TabsTrigger>
-                  </TabsList>
-                  <TabsContent value="pct" className="space-y-4 mt-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Porcentaje de ingresos</label>
-                      <div className="relative">
-                        <Input 
-                          type="number" 
-                          value={tempPct}
-                          onChange={(e) => setTempPct(e.target.value)}
-                          className="h-12 pl-4 pr-8 rounded-2xl font-medium"
-                          min="0"
-                          step="0.1"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+                  <DialogTrigger asChild>
+                    <div className="flex flex-col items-end text-right cursor-pointer hover:opacity-80 transition-opacity min-w-0">
+                      <div className="flex items-center gap-1 mb-1 text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground whitespace-nowrap">
+                        <span>Sugerido ({customFixedAmount !== null ? 'Fijo' : `${actualPercentage}%`})</span>
+                        <Settings2 className="w-3 h-3 flex-shrink-0" />
                       </div>
+                      <span className="text-[clamp(1rem,4.5vw,1.125rem)] font-medium text-gold whitespace-nowrap">{formatMoney(suggestedTithe)}</span>
                     </div>
-                    <Button onClick={() => handleSaveConfig('pct')} className="w-full h-12 rounded-full font-medium bg-gold hover:bg-gold/90 text-gold-foreground">
-                      Guardar Configuración
-                    </Button>
-                  </TabsContent>
-                  <TabsContent value="amt" className="space-y-4 mt-6">
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-muted-foreground">Monto fijo mensual</label>
-                      <div className="relative">
-                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground z-10">$</span>
-                        <MoneyInput 
-                          value={tempAmt ? parseFloat(tempAmt) : undefined}
-                          onChange={(val) => setTempAmt(val?.toString() || '')}
-                          baseTextSize="text-sm"
-                          className="flex h-12 w-full rounded-2xl border border-input bg-background px-3 py-1 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-8 font-medium text-left"
-                          placeholder="0,00"
-                        />
-                      </div>
-                    </div>
-                    <Button onClick={() => handleSaveConfig('amt')} className="w-full h-12 rounded-full font-medium bg-gold hover:bg-gold/90 text-gold-foreground">
-                      Guardar Configuración
-                    </Button>
-                  </TabsContent>
-                </Tabs>
-              </DialogContent>
-            </Dialog>
-          </div>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md rounded-3xl p-6">
+                    <DialogHeader>
+                      <DialogTitle className="text-xl">Configurar Diezmo Sugerido</DialogTitle>
+                    </DialogHeader>
+                    <Tabs defaultValue={customFixedAmount !== null ? 'amt' : 'pct'} className="mt-4">
+                      <TabsList className="grid w-full grid-cols-2 rounded-xl">
+                        <TabsTrigger value="pct" className="rounded-lg">Porcentaje</TabsTrigger>
+                        <TabsTrigger value="amt" className="rounded-lg">Monto Fijo</TabsTrigger>
+                      </TabsList>
+                      <TabsContent value="pct" className="space-y-4 mt-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Porcentaje de ingresos</label>
+                          <div className="relative">
+                            <Input 
+                              type="number" 
+                              value={tempPct}
+                              onChange={(e) => setTempPct(e.target.value)}
+                              className="h-12 pl-4 pr-8 rounded-2xl font-medium"
+                              min="0"
+                              step="0.1"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-muted-foreground">%</span>
+                          </div>
+                        </div>
+                        <Button onClick={() => handleSaveConfig('pct')} className="w-full h-12 rounded-full font-medium bg-gold hover:bg-gold/90 text-gold-foreground">
+                          Guardar Configuración
+                        </Button>
+                      </TabsContent>
+                      <TabsContent value="amt" className="space-y-4 mt-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-muted-foreground">Monto fijo mensual</label>
+                          <div className="relative">
+                            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground z-10">$</span>
+                            <MoneyInput 
+                              value={tempAmt ? parseFloat(tempAmt) : undefined}
+                              onChange={(val) => setTempAmt(val?.toString() || '')}
+                              baseTextSize="text-sm"
+                              className="flex h-12 w-full rounded-2xl border border-input bg-background px-3 py-1 shadow-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring pl-8 font-medium text-left"
+                              placeholder="0,00"
+                            />
+                          </div>
+                        </div>
+                        <Button onClick={() => handleSaveConfig('amt')} className="w-full h-12 rounded-full font-medium bg-gold hover:bg-gold/90 text-gold-foreground">
+                          Guardar Configuración
+                        </Button>
+                      </TabsContent>
+                    </Tabs>
+                  </DialogContent>
+                </Dialog>
+              </div>
 
-          <div className="space-y-2 mt-2">
-            <div className="flex justify-between text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground gap-2">
-              <span className="whitespace-nowrap truncate">Entregado: {formatMoney(totalPaid)}</span>
-              <span className="whitespace-nowrap truncate">Ingresos: {formatMoney(incomes)}</span>
-            </div>
-            <div className="h-2 w-full bg-gold/20 rounded-full overflow-hidden">
-              <div className="h-full bg-gold rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
-            </div>
-          </div>
+              <div className="space-y-2 mt-2">
+                <div className="flex justify-between text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground gap-2">
+                  <span className="whitespace-nowrap truncate">Entregado: {formatMoney(totalPaid)}</span>
+                  <span className="whitespace-nowrap truncate">Ingresos: {formatMoney(incomes)}</span>
+                </div>
+                <div className="h-2 w-full bg-gold/20 rounded-full overflow-hidden">
+                  <div className="h-full bg-gold rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
+                </div>
+              </div>
 
-        </CardContent>
-      </Card>
+            </CardContent>
+
+            <button 
+              onClick={(e) => { e.preventDefault(); setIsFlipped(true); }} 
+              className="absolute bottom-3 right-3 p-2 text-gold/60 hover:text-gold z-20 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </Card>
+
+          {/* BACK SIDE */}
+          <Card 
+            style={{ 
+              backfaceVisibility: 'hidden', 
+              WebkitBackfaceVisibility: 'hidden',
+              transform: 'rotateY(180deg)',
+              pointerEvents: isFlipped ? 'auto' : 'none'
+            }}
+            className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm absolute inset-0 overflow-hidden w-full h-full flex flex-col items-center justify-center p-6"
+          >
+            <div className="absolute -left-8 -top-8 text-gold/10">
+              <HandHeart className="w-48 h-48" />
+            </div>
+            <div className="relative z-10 flex flex-col items-center text-center space-y-4 max-w-[280px]">
+              <p className="text-[13px] md:text-sm italic text-foreground/90 leading-relaxed font-medium">
+                "Traigan íntegro el diezmo para los fondos del templo, y así habrá alimento en mi casa. Pruébenme en esto —dice el Señor Todopoderoso—, y vean si no abro las compuertas del cielo y derramo sobre ustedes bendición hasta que sobreabunde."
+              </p>
+              <p className="text-[10px] md:text-xs font-bold text-gold tracking-widest uppercase">
+                Malaquías 3:10
+              </p>
+            </div>
+            
+            <button 
+              onClick={(e) => { e.preventDefault(); setIsFlipped(false); }} 
+              className="absolute bottom-3 right-3 p-2 text-gold/60 hover:text-gold z-20 transition-colors"
+            >
+              <RotateCcw className="w-4 h-4" />
+            </button>
+          </Card>
+        </div>
+      </div>
 
       {/* Formulario de registro */}
       <form onSubmit={handleRegister} className="flex flex-col gap-4">

@@ -53,6 +53,12 @@ function InputField({
 }
 
 export function SimulatorModal({ month, year, commitments, onClose }: SimulatorModalProps) {
+  const [isClosing, setIsClosing] = useState(false);
+
+  const handleClose = () => {
+    setIsClosing(true);
+    setTimeout(onClose, 300);
+  };
   const [income, setIncome] = useState<number | null>(null);
   const [additionalIncome, setAdditionalIncome] = useState<number | null>(null);
   const [extraExpenses, setExtraExpenses] = useState<number | null>(null);
@@ -79,12 +85,28 @@ export function SimulatorModal({ month, year, commitments, onClose }: SimulatorM
   const isDanger = pct >= 90 || balance < 0;
 
   return (
-    <>
+    <div
+      className={cn(
+        "fixed inset-0 z-[60] flex flex-col justify-end duration-300",
+        isClosing ? "animate-out fade-out pointer-events-none" : "animate-in fade-in"
+      )}
+      style={{ touchAction: 'none', overscrollBehavior: 'none' }}
+      onWheel={(e) => e.stopPropagation()}
+    >
+      {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onClose}
+        className="absolute inset-0 bg-background/60 backdrop-blur-sm"
+        onClick={handleClose}
       />
-      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto bg-card rounded-t-3xl border-t border-border/50 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
+      {/* Sheet */}
+      <div 
+        className={cn(
+          "relative max-w-md w-full mx-auto bg-card rounded-t-3xl border-t border-border/50 shadow-2xl duration-300 max-h-[90vh] flex flex-col",
+          isClosing ? "animate-out slide-out-to-bottom" : "animate-in slide-in-from-bottom"
+        )}
+        style={{ touchAction: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 flex-none">
           <div className="w-10 h-1 bg-border rounded-full" />
@@ -99,7 +121,7 @@ export function SimulatorModal({ month, year, commitments, onClose }: SimulatorM
             </p>
           </div>
           <button
-            onClick={onClose}
+            onClick={handleClose}
             className="p-2 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           >
             <X className="w-4 h-4" />
@@ -107,7 +129,7 @@ export function SimulatorModal({ month, year, commitments, onClose }: SimulatorM
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto px-5 py-5 flex flex-col gap-5">
+        <div className="flex-1 overflow-y-auto overscroll-y-contain px-5 pt-5 pb-28 flex flex-col gap-5">
           {/* Inputs */}
           <div className="flex flex-col gap-4">
             <InputField label="Ingreso esperado" value={income} onChange={setIncome} />
@@ -229,6 +251,6 @@ export function SimulatorModal({ month, year, commitments, onClose }: SimulatorM
           )}
         </div>
       </div>
-    </>
+    </div>
   );
 }

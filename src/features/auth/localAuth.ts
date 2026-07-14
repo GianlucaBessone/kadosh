@@ -154,7 +154,7 @@ export async function verifyBiometrics(): Promise<boolean> {
         challenge,
         allowCredentials: [{
           type: "public-key",
-          id: rawId,
+          id: rawId as unknown as BufferSource,
           transports: ["internal"]
         }],
         userVerification: "required",

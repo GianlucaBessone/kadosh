@@ -30,8 +30,18 @@ export default function SeedsPage() {
 
       <div className="grid gap-4 mt-4">
         {seeds.length === 0 && (
-          <div className="text-center text-muted-foreground py-12">
-            No tienes semillas plantadas.
+          <div className="flex flex-col items-center justify-center text-center py-12 px-4">
+            <p className="text-muted-foreground mb-8">
+              No tienes semillas plantadas.
+            </p>
+            <div className="max-w-sm space-y-4">
+              <p className="text-[15px] italic text-foreground/90 leading-relaxed font-medium">
+                "Recuerden esto: El que siembra escasamente, escasamente cosechará, y el que siembra en abundancia, en abundancia cosechará."
+              </p>
+              <p className="text-xs font-bold text-primary tracking-widest uppercase">
+                2 Corintios 9:6
+              </p>
+            </div>
           </div>
         )}
 

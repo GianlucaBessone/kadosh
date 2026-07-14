@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { X, Settings, ChevronDown, CalendarDays, Building2, User } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -8,10 +9,31 @@ import { db } from '@/lib/db';
 import { cn } from '@/lib/utils';
 
 interface MoreSheetProps {
+  isOpen: boolean;
   onClose: () => void;
 }
 
-export function MoreSheet({ onClose }: MoreSheetProps) {
+export function MoreSheet({ isOpen, onClose }: MoreSheetProps) {
+  const [shouldRender, setShouldRender] = useState(isOpen);
+  const [isClosing, setIsClosing] = useState(false);
+
+  useEffect(() => {
+    if (isOpen) {
+      setShouldRender(true);
+      setIsClosing(false);
+    } else if (shouldRender) {
+      setIsClosing(true);
+      const timer = setTimeout(() => {
+        setShouldRender(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, shouldRender]);
+
+  const handleClose = () => {
+    onClose(); // This sets isOpen to false in parent, triggering the useEffect
+  };
+
   const router = useRouter();
   const user = useLiveQuery(() => db.users.orderBy('id').first());
   const userName = user?.name
@@ -25,8 +47,10 @@ export function MoreSheet({ onClose }: MoreSheetProps) {
     .join('');
 
   const handleProfileClick = () => {
-    onClose();
-    router.push('/profile');
+    handleClose();
+    setTimeout(() => {
+      router.push('/profile');
+    }, 300);
   };
 
   const modules = [
@@ -46,22 +70,39 @@ export function MoreSheet({ onClose }: MoreSheetProps) {
     },
   ];
 
+  if (!shouldRender) return null;
+
   return (
-    <>
+    <div
+      className={cn(
+        "fixed inset-0 z-40 flex flex-col justify-end duration-300",
+        isClosing ? "animate-out fade-out pointer-events-none" : "animate-in fade-in"
+      )}
+      style={{ touchAction: 'none', overscrollBehavior: 'none' }}
+      onWheel={(e) => e.stopPropagation()}
+    >
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onClose}
+        className="absolute inset-0 bg-background/60 backdrop-blur-sm"
+        onClick={handleClose}
       />
 
       {/* Sheet */}
-      <div className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto bg-card rounded-t-3xl border-t border-border/40 shadow-2xl animate-in slide-in-from-bottom duration-300">
+      <div 
+        className={cn(
+          "relative max-w-md w-full mx-auto bg-card rounded-t-3xl border-t border-border/40 shadow-2xl duration-300",
+          isClosing ? "animate-out slide-out-to-bottom" : "animate-in slide-in-from-bottom"
+        )}
+        style={{ touchAction: 'auto' }}
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1">
           <div className="w-10 h-1 bg-border rounded-full" />
         </div>
 
-        <div className="px-5 py-4 flex flex-col gap-5">
+        {/* Content */}
+        <div className="px-6 pt-6 pb-28 flex flex-col gap-6 overflow-y-auto overscroll-y-contain max-h-[85vh]">
           {/* Profile row */}
           <div className="flex items-center gap-3">
             {user?.avatarUrl ? (
@@ -152,6 +193,6 @@ export function MoreSheet({ onClose }: MoreSheetProps) {
           <div className="pb-safe-bottom pb-4" />
         </div>
       </div>
-    </>
+    </div>
   );
 }
