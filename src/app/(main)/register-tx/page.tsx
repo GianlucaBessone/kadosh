@@ -5,16 +5,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, ShoppingCart, Home, Car, Utensils, Pill, BookOpen, Film, Lightbulb, Shirt, Package, Briefcase, Laptop, Gift, TrendingUp, Building2 } from 'lucide-react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { TransactionService } from '@/services/transactionService';
 import { db } from '@/lib/db';
 
 export default function RegisterTransactionPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
+  
+  const typeParam = searchParams.get('type');
+  const defaultTab = typeParam === 'INCOME' ? 'income' : 'expense';
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, type: 'INCOME' | 'EXPENSE' | 'TRANSFER') => {
     e.preventDefault();
@@ -43,7 +47,7 @@ export default function RegisterTransactionPage() {
         let user = await db.users.orderBy('id').first();
         if (!user) {
            const userId = crypto.randomUUID();
-           user = { id: userId, email: '', name: 'Usuario', lastName: '', createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), deletedAt: null };
+           user = { id: userId, email: '', name: 'Usuario', lastName: '', avatarUrl: null, isCloudLinked: false, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), deletedAt: null };
            await db.users.add(user);
         }
         
@@ -85,11 +89,10 @@ export default function RegisterTransactionPage() {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">Registrar movimiento</h1>
       </div>
 
-      <Tabs defaultValue="expense" className="w-full">
-        <TabsList className="grid w-full grid-cols-3 bg-muted/50 rounded-full h-12 p-1">
+      <Tabs defaultValue={defaultTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 bg-muted/50 rounded-full h-12 p-1">
           <TabsTrigger value="expense" className="rounded-full data-[state=active]:bg-card data-[state=active]:text-destructive data-[state=active]:shadow-sm">Gasto</TabsTrigger>
           <TabsTrigger value="income" className="rounded-full data-[state=active]:bg-card data-[state=active]:text-success data-[state=active]:shadow-sm">Ingreso</TabsTrigger>
-          <TabsTrigger value="transfer" className="rounded-full data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:shadow-sm">Transferencia</TabsTrigger>
         </TabsList>
 
         {/* GASTO */}
@@ -116,20 +119,20 @@ export default function RegisterTransactionPage() {
             <div className="space-y-2">
               <Label htmlFor="category" className="text-xs text-muted-foreground ml-2">Categoría</Label>
               <Select name="category" required>
-                <SelectTrigger id="category" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary text-base">
+                <SelectTrigger id="category" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary focus:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary text-base">
                   <SelectValue placeholder="Selecciona una categoría..." />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl">
-                  <SelectItem value="supermarket">🛒 Supermercado</SelectItem>
-                  <SelectItem value="housing">🏠 Hogar</SelectItem>
-                  <SelectItem value="transport">🚗 Transporte</SelectItem>
-                  <SelectItem value="food">🍽️ Comida / Restaurantes</SelectItem>
-                  <SelectItem value="health">💊 Salud</SelectItem>
-                  <SelectItem value="education">📚 Educación</SelectItem>
-                  <SelectItem value="entertainment">🎬 Entretenimiento</SelectItem>
-                  <SelectItem value="services">💡 Servicios</SelectItem>
-                  <SelectItem value="clothing">👕 Ropa</SelectItem>
-                  <SelectItem value="other">📦 Otros</SelectItem>
+                  <SelectItem value="supermarket"><div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-muted-foreground" /> Supermercado</div></SelectItem>
+                  <SelectItem value="housing"><div className="flex items-center gap-2"><Home className="w-4 h-4 text-muted-foreground" /> Hogar</div></SelectItem>
+                  <SelectItem value="transport"><div className="flex items-center gap-2"><Car className="w-4 h-4 text-muted-foreground" /> Transporte</div></SelectItem>
+                  <SelectItem value="food"><div className="flex items-center gap-2"><Utensils className="w-4 h-4 text-muted-foreground" /> Comida / Restaurantes</div></SelectItem>
+                  <SelectItem value="health"><div className="flex items-center gap-2"><Pill className="w-4 h-4 text-muted-foreground" /> Salud</div></SelectItem>
+                  <SelectItem value="education"><div className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-muted-foreground" /> Educación</div></SelectItem>
+                  <SelectItem value="entertainment"><div className="flex items-center gap-2"><Film className="w-4 h-4 text-muted-foreground" /> Entretenimiento</div></SelectItem>
+                  <SelectItem value="services"><div className="flex items-center gap-2"><Lightbulb className="w-4 h-4 text-muted-foreground" /> Servicios</div></SelectItem>
+                  <SelectItem value="clothing"><div className="flex items-center gap-2"><Shirt className="w-4 h-4 text-muted-foreground" /> Ropa</div></SelectItem>
+                  <SelectItem value="other"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-muted-foreground" /> Otros</div></SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -183,16 +186,16 @@ export default function RegisterTransactionPage() {
             <div className="space-y-2">
               <Label htmlFor="category-income" className="text-xs text-muted-foreground ml-2">Categoría</Label>
               <Select name="category" required>
-                <SelectTrigger id="category-income" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary text-base">
+                <SelectTrigger id="category-income" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary focus:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary text-base">
                   <SelectValue placeholder="Selecciona una categoría..." />
                 </SelectTrigger>
                 <SelectContent className="rounded-2xl">
-                  <SelectItem value="salary">💼 Salario</SelectItem>
-                  <SelectItem value="freelance">💻 Freelance</SelectItem>
-                  <SelectItem value="gifts">🎁 Regalos</SelectItem>
-                  <SelectItem value="investments">📈 Inversiones</SelectItem>
-                  <SelectItem value="business">🏢 Negocio</SelectItem>
-                  <SelectItem value="other">📦 Otros</SelectItem>
+                  <SelectItem value="salary"><div className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-muted-foreground" /> Salario</div></SelectItem>
+                  <SelectItem value="freelance"><div className="flex items-center gap-2"><Laptop className="w-4 h-4 text-muted-foreground" /> Freelance</div></SelectItem>
+                  <SelectItem value="gifts"><div className="flex items-center gap-2"><Gift className="w-4 h-4 text-muted-foreground" /> Regalos</div></SelectItem>
+                  <SelectItem value="investments"><div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-muted-foreground" /> Inversiones</div></SelectItem>
+                  <SelectItem value="business"><div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-muted-foreground" /> Negocio</div></SelectItem>
+                  <SelectItem value="other"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-muted-foreground" /> Otros</div></SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -225,28 +228,6 @@ export default function RegisterTransactionPage() {
           </form>
         </TabsContent>
 
-        {/* TRANSFERENCIA */}
-        <TabsContent value="transfer" className="mt-6 space-y-6">
-          <form className="flex flex-col gap-6" onSubmit={(e) => handleSubmit(e, 'TRANSFER')}>
-             <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm">
-              <span className="text-sm text-muted-foreground uppercase font-medium tracking-wider mb-2">Monto</span>
-              <div className="flex items-center text-4xl font-bold text-primary">
-                <span className="mr-2 text-2xl opacity-50">$</span>
-                <input 
-                  type="number" 
-                  name="amount"
-                  step="0.01"
-                  required
-                  placeholder="0.00" 
-                  className="bg-transparent border-none outline-none w-32 text-center text-foreground placeholder:text-muted-foreground/30"
-                />
-              </div>
-            </div>
-             <Button disabled={loading} className="w-full h-14 rounded-full mt-4 shadow-md font-medium text-lg">
-              {loading ? 'Guardando...' : 'Registrar Transferencia'}
-            </Button>
-          </form>
-        </TabsContent>
       </Tabs>
     </div>
   )

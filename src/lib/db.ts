@@ -5,6 +5,8 @@ export interface User {
   email: string;
   name: string | null;
   lastName: string | null;
+  avatarUrl: string | null;    // base64 data-URL stored locally (offline-first)
+  isCloudLinked: boolean;     // true when a Supabase account is associated
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -173,6 +175,34 @@ export class KadoshDB extends Dexie {
 
   constructor() {
     super('KadoshDB');
+    this.version(5).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      accounts: 'id, userId',
+      categories: 'id, userId, type',
+      transactions: 'id, userId, accountId, categoryId, type, date',
+      seedGoals: 'id, userId, status, createdAt',
+      seedContributions: 'id, seedGoalId, date',
+      tithes: 'id, userId, [month+year], createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+    });
+    this.version(4).stores({
+      users: 'id, email',
+      settings: 'id, userId',
+      accounts: 'id, userId',
+      categories: 'id, userId, type',
+      transactions: 'id, userId, accountId, categoryId, type, date',
+      seedGoals: 'id, userId, status, createdAt',
+      seedContributions: 'id, seedGoalId, date',
+      tithes: 'id, userId, [month+year], createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+    });
     this.version(3).stores({
       users: 'id, email',
       settings: 'id, userId',
@@ -219,3 +249,23 @@ export class KadoshDB extends Dexie {
 }
 
 export const db = new KadoshDB();
+
+export async function clearAllUserData() {
+  await db.transaction('rw', [
+    db.users, db.settings, db.accounts, db.categories, db.transactions,
+    db.seedGoals, db.seedContributions, db.tithes, db.notifications,
+    db.syncQueue, db.metadata
+  ], async () => {
+    await db.users.clear();
+    await db.settings.clear();
+    await db.accounts.clear();
+    await db.categories.clear();
+    await db.transactions.clear();
+    await db.seedGoals.clear();
+    await db.seedContributions.clear();
+    await db.tithes.clear();
+    await db.notifications.clear();
+    await db.syncQueue.clear();
+    await db.metadata.clear();
+  });
+}

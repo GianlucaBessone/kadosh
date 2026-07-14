@@ -59,7 +59,8 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
     if (!containerRef.current || !isOpen) return;
     const observer = new ResizeObserver((entries) => {
       const { width } = entries[0].contentRect;
-      setScale(width / 1080);
+      // Añadimos +2 de ancho para que el escalado cubra siempre los bordes (anti-subpixel gap)
+      setScale((width + 2) / 1080);
     });
     observer.observe(containerRef.current);
     return () => observer.disconnect();
@@ -136,8 +137,6 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
         const blob = await (await fetch(dataUrl)).blob();
         const file = new File([blob], 'versiculo.jpg', { type: 'image/jpeg' });
         await navigator.share({
-          title: 'Versículo del Día - KADOSH',
-          text: 'Inspiración diaria de KADOSH',
           files: [file]
         });
       } catch (err) {
@@ -149,13 +148,15 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+    <div className="fixed inset-x-0 top-0 bottom-20 z-[60] flex items-center justify-center px-4 py-4 bg-background/80 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} />
       
-      <div className="relative w-full max-w-md p-4 rounded-3xl bg-card border border-border/50 shadow-xl animate-in fade-in zoom-in-95 duration-200 flex flex-col max-h-[95vh]">
-        <div className="flex items-center justify-between mb-4 shrink-0">
+      <div className="relative w-full max-w-md rounded-3xl bg-card border border-border/50 shadow-xl animate-in fade-in zoom-in-95 duration-200 flex flex-col h-full max-h-full">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-3 shrink-0">
           <h2 className="text-lg font-semibold tracking-tight">Compartir Versículo</h2>
-          <button 
+          <button
             onClick={onClose}
             className="p-2 rounded-full hover:bg-muted text-muted-foreground transition-colors"
           >
@@ -163,22 +164,19 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
           </button>
         </div>
 
-        <div className="flex flex-col gap-4 overflow-y-auto overflow-x-hidden scrollbar-hide">
-          
-          {/* Vista Previa Container */}
-          <div 
+        {/* Scrollable preview */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden px-5 pb-3 scrollbar-hide">
+          <div
             ref={containerRef}
-            className="rounded-2xl overflow-hidden shadow-lg border border-border/30 bg-muted/20 relative w-full max-w-[280px] mx-auto aspect-[9/16] min-h-[350px] shrink-0"
+            className="rounded-2xl overflow-hidden shadow-lg border border-border/30 bg-transparent relative w-full max-w-[280px] mx-auto aspect-[9/16] shrink-0"
           >
-            
-            <div 
-              className="absolute transform origin-top-left"
-              style={{ transform: `scale(${scale || 0.25})` }}
+            <div
+              className="absolute top-1/2 left-1/2"
+              style={{ transform: `translate(-50%, -50%) scale(${scale || 0.25})` }}
             >
-              
               {/* Element captured. 1080x1920 */}
               <div ref={cardRef} className={getDesignClasses()}>
-                
+
                 {design === 'elegant' && (
                   <div className="absolute inset-8 border-[4px] border-current opacity-15 rounded-2xl pointer-events-none" />
                 )}
@@ -188,7 +186,7 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
                     <div className="absolute bottom-16 right-16 w-32 h-32 border-b-[8px] border-r-[8px] border-current opacity-20 pointer-events-none" />
                   </>
                 )}
-                
+
                 {/* TOP AREA: Leaf Icon */}
                 <div className="w-full flex justify-center pt-32">
                   <LeafIcon className="w-40 h-40 opacity-40" />
@@ -217,11 +215,15 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
 
               </div>
             </div>
-            
           </div>
+        </div>
 
-          <div className="flex items-center justify-between">
-            <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide snap-x">
+        {/* ── Fixed bottom controls ─────────────────────────────────────── */}
+        <div className="shrink-0 px-5 pb-5 pt-3 border-t border-border/40 flex flex-col gap-3 bg-card rounded-b-3xl">
+
+          {/* Style selector row */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x flex-1 min-w-0">
               {DESIGNS.map(d => (
                 <button
                   key={d.id}
@@ -234,27 +236,28 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
                 </button>
               ))}
             </div>
-            
-            <button 
+
+            <button
               onClick={() => setIsDark(!isDark)}
-              className="p-2 ml-2 rounded-full bg-muted text-muted-foreground shrink-0"
+              className="p-2 ml-1 rounded-full bg-muted text-muted-foreground shrink-0 hover:bg-muted/70 transition-colors"
             >
               {isDark ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-1">
-            <Button 
-              variant="outline" 
-              className="rounded-xl h-12" 
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            <Button
+              variant="outline"
+              className="rounded-xl h-12"
               onClick={handleDownload}
               disabled={isGenerating}
             >
               <Download className="w-4 h-4 mr-2" />
               Descargar
             </Button>
-            <Button 
-              className="rounded-xl h-12 bg-primary text-primary-foreground hover:bg-primary/90" 
+            <Button
+              className="rounded-xl h-12 bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={handleShare}
               disabled={isGenerating}
             >
@@ -262,6 +265,7 @@ export function ShareVerseModal({ verse, isOpen, onClose }: ShareVerseModalProps
               Compartir
             </Button>
           </div>
+
         </div>
       </div>
     </div>

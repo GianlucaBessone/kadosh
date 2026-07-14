@@ -49,3 +49,17 @@ export function lockApp(): void {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem('kadosh_unlocked');
 }
+
+// Clear all local auth data (pin, session, and cloud cookies)
+export function clearLocalAuth(): void {
+  if (typeof window === 'undefined') return;
+  localStorage.removeItem('kadosh_pin_hash');
+  sessionStorage.removeItem('kadosh_unlocked');
+  
+  // Clear any Supabase cloud session cookies if present
+  document.cookie.split(';').forEach(c => {
+    if (c.trim().startsWith('sb-')) {
+      document.cookie = c.trim().split('=')[0] + '=;expires=Thu, 01 Jan 1970 00:00:00 UTC;path=/';
+    }
+  });
+}
