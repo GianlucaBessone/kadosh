@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { X, TrendingUp, TrendingDown, Minus, Droplet, HandHeart } from 'lucide-react';
-import { formatMoney, cn } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { monthName } from '../utils/dateUtils';
 import {
   calcProjectedBalance,
@@ -13,14 +14,14 @@ import {
 import type { FinancialCommitment } from '@/lib/db';
 import Link from 'next/link';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
-import type { PlanningPeriod } from '../types';
-import { commitmentAppliesToPeriod } from '../utils/dateUtils';
+import type { PlanningPeriod, MonthlyCommitmentItem } from '../types';
+import { installmentAppliesToPeriod } from '../utils/dateUtils';
 
 interface SimulatorModalProps {
   month: number;
   year: number;
   initialPeriod: PlanningPeriod;
-  commitments: FinancialCommitment[];
+  commitments: MonthlyCommitmentItem[];
   onClose: () => void;
 }
 
@@ -69,8 +70,8 @@ export function SimulatorModal({ month, year, initialPeriod, commitments, onClos
   const [extraExpenses, setExtraExpenses] = useState<number | null>(null);
   const [desiredSavings, setDesiredSavings] = useState<number | null>(null);
 
-  const filteredCommitments = commitments.filter(c => commitmentAppliesToPeriod(c, month, year, selectedPeriod));
-  const totalCommitted = filteredCommitments.reduce((s, c) => s + c.installmentAmount, 0);
+  const filteredCommitments = commitments.filter(item => installmentAppliesToPeriod(item.commitment, item, selectedPeriod));
+  const totalCommitted = filteredCommitments.reduce((s, item) => s + item.commitment.installmentAmount, 0);
   const incomeNum = (income || 0);
   const additionalNum = (additionalIncome || 0);
   const extraNum = (extraExpenses || 0);
@@ -148,30 +149,30 @@ export function SimulatorModal({ month, year, initialPeriod, commitments, onClos
 
           {/* Calculation breakdown */}
           <div className="bg-muted/50 rounded-2xl p-4 flex flex-col gap-3">
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm items-center">
               <span className="text-muted-foreground">Ingresos totales</span>
-              <span className="font-semibold">{formatMoney(totalIncome)}</span>
+              <span className="font-semibold"><MoneyDisplay amount={totalIncome} /></span>
             </div>
-            <div className="flex justify-between text-sm">
+            <div className="flex justify-between text-sm items-center">
               <span className="text-muted-foreground">Compromisos del mes</span>
-              <span className="font-semibold text-destructive">−{formatMoney(totalCommitted)}</span>
+              <span className="font-semibold text-destructive">−<MoneyDisplay amount={totalCommitted} /></span>
             </div>
             {extraNum > 0 && (
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-sm items-center">
                 <span className="text-muted-foreground">Gastos extraordinarios</span>
-                <span className="font-semibold text-destructive">−{formatMoney(extraNum)}</span>
+                <span className="font-semibold text-destructive">−<MoneyDisplay amount={extraNum} /></span>
               </div>
             )}
             <div className="h-px bg-border/60" />
-            <div className="flex justify-between">
+            <div className="flex justify-between items-center">
               <span className="text-sm font-semibold text-foreground">Balance proyectado</span>
               <span
                 className={cn(
-                  'text-base font-bold',
+                  'text-base font-bold flex items-center',
                   isDanger ? 'text-destructive' : isWarning ? 'text-gold' : 'text-success'
                 )}
               >
-                {formatMoney(balance)}
+                <MoneyDisplay amount={balance} />
               </span>
             </div>
           </div>
@@ -207,11 +208,11 @@ export function SimulatorModal({ month, year, initialPeriod, commitments, onClos
               </p>
               <p
                 className={cn(
-                  'text-xl font-bold',
+                  'text-xl font-bold flex items-center',
                   savingsCapacity >= 0 ? 'text-success' : 'text-destructive'
                 )}
               >
-                {formatMoney(savingsCapacity)}
+                <MoneyDisplay amount={savingsCapacity} />
               </p>
             </div>
           </div>
@@ -226,7 +227,7 @@ export function SimulatorModal({ month, year, initialPeriod, commitments, onClos
                 <p className="text-xs font-semibold text-gold uppercase tracking-wider">
                   Diezmo estimado
                 </p>
-                <p className="text-sm font-bold text-foreground">{formatMoney(tithe)}</p>
+                <p className="text-sm font-bold text-foreground flex items-center"><MoneyDisplay amount={tithe} /></p>
                 <p className="text-[10px] text-muted-foreground mt-0.5">
                   El 10% de tus ingresos, como sugerencia.
                 </p>

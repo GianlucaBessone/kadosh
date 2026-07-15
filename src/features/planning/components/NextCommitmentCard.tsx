@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { CalendarDays, ArrowRight } from 'lucide-react';
-import { formatMoney } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { formatShortDate } from '../utils/dateUtils';
 import type { FinancialCommitment } from '@/lib/db';
 
@@ -30,7 +30,7 @@ export function NextCommitmentCard({ commitment, dueDate }: NextCommitmentCardPr
         <div className="flex items-center justify-between gap-3">
           <div className="flex flex-col gap-0.5 min-w-0">
             <h3 className="text-base font-bold text-foreground truncate">{commitment.name}</h3>
-            <p className="text-sm font-bold text-foreground">{formatMoney(commitment.installmentAmount)}</p>
+            <p className="text-sm font-bold text-foreground flex items-center"><MoneyDisplay amount={commitment.installmentAmount} /></p>
             <p
               className={`text-xs font-medium mt-0.5 ${
                 isOverdue ? 'text-destructive' : isUrgent ? 'text-gold' : 'text-muted-foreground'

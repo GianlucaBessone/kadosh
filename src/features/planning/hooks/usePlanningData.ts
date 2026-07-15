@@ -25,6 +25,25 @@ export function useAllCommitments(ownerId: string | undefined): FinancialCommitm
 }
 
 /**
+ * Reactively fetches all paused commitments for the current user.
+ */
+export function usePausedCommitments(ownerId: string | undefined): FinancialCommitment[] {
+  return (
+    useLiveQuery(
+      () =>
+        ownerId
+          ? db.financialCommitments
+              .where('ownerId')
+              .equals(ownerId)
+              .filter(c => c.deletedAt === null && c.status === 'PAUSED')
+              .toArray()
+          : [],
+      [ownerId]
+    ) ?? []
+  );
+}
+
+/**
  * Reactively fetches a single commitment by ID.
  */
 export function useCommitment(id: string | undefined): FinancialCommitment | undefined {

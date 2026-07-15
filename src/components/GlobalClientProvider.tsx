@@ -94,7 +94,7 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
   return (
     <TooltipProvider>
       <ThemeApplier />
-      {!publicRoute && <OnboardingModal />}
+      {pathname !== '/welcome' && <OnboardingModal />}
       {children}
     </TooltipProvider>
   );

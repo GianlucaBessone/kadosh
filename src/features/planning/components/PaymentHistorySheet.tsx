@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { CheckCircle2, Clock, Circle, Trash2 } from 'lucide-react';
-import { formatMoney } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import type { CommitmentPayment, FinancialCommitment } from '@/lib/db';
 import { formatShortDate } from '../utils/dateUtils';
 import { PlanningService } from '../services/planningService';
@@ -101,7 +101,7 @@ export function PaymentHistorySheet({ commitment, payments, onClose }: PaymentHi
               {/* Amount & Actions */}
               <div className="flex items-center gap-2">
                 <span className="text-sm font-semibold text-foreground">
-                  {formatMoney(payment.amount)}
+                  <MoneyDisplay amount={payment.amount} />
                 </span>
                 <button
                   onClick={() => setConfirmDeleteId(payment.id)}
@@ -130,7 +130,7 @@ export function PaymentHistorySheet({ commitment, payments, onClose }: PaymentHi
                     <p className="text-xs text-muted-foreground">Pendiente</p>
                   </div>
                   <span className="text-sm text-muted-foreground">
-                    {formatMoney(commitment.installmentAmount)}
+                    <MoneyDisplay amount={commitment.installmentAmount} />
                   </span>
                 </div>
               ))}

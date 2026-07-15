@@ -12,9 +12,9 @@ import { MonthlySummaryCard } from '@/features/planning/components/MonthlySummar
 import { CommitmentCard } from '@/features/planning/components/CommitmentCard';
 import { SimulatorModal } from '@/features/planning/components/SimulatorModal';
 import { PaymentHistorySheet } from '@/features/planning/components/PaymentHistorySheet';
-import { useCommitmentPayments } from '@/features/planning/hooks/usePlanningData';
-import { getInstallmentNumberForMonth } from '@/features/planning/utils/dateUtils';
+import { useCommitmentPayments, usePausedCommitments } from '@/features/planning/hooks/usePlanningData';
 import type { FinancialCommitment } from '@/lib/db';
+import { PausedCommitmentCard } from '@/features/planning/components/PausedCommitmentCard';
 import { useRouter } from 'next/navigation';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
 import type { PlanningPeriod } from '@/features/planning/types';
@@ -51,6 +51,7 @@ export default function PlanningPage() {
   const ownerId = user?.id ?? '';
 
   const allCommitments = useAllCommitments(ownerId);
+  const pausedCommitments = usePausedCommitments(ownerId);
   const fullMonthEntries = useMonthlyCommitments(allCommitments, selectedMonth, selectedYear, 'MONTH');
   const monthlyEntries = useMonthlyCommitments(allCommitments, selectedMonth, selectedYear, selectedPeriod);
   const summary = useMonthlySummary(allCommitments, selectedMonth, selectedYear, selectedPeriod);
@@ -179,15 +180,12 @@ export default function PlanningPage() {
             <span className="text-xs text-muted-foreground">{monthlyEntries.length} compromisos</span>
           </div>
 
-          {monthlyEntries.map(({ commitment, dueDate }) => {
-            const installmentNumber = getInstallmentNumberForMonth(
-              commitment,
-              selectedMonth,
-              selectedYear
-            );
+          {monthlyEntries.map((item, index) => {
+            const { commitment, dueDate, installmentIndex } = item;
+            const installmentNumber = installmentIndex + 1;
             return (
               <CommitmentCard
-                key={commitment.id}
+                key={`${commitment.id}-${installmentIndex}-${index}`}
                 commitment={commitment}
                 dueDate={dueDate}
                 installmentNumber={installmentNumber}
@@ -200,14 +198,28 @@ export default function PlanningPage() {
         </div>
       )}
 
-      {/* FAB */}
-      <Link
-        href="/planning/new"
-        className="fixed bottom-24 right-4 z-30 w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 flex items-center justify-center hover:bg-primary/90 transition-all active:scale-95"
-        aria-label="Nuevo compromiso"
-      >
-        <Plus className="w-6 h-6" />
-      </Link>
+      {/* Paused Commitments Section */}
+      {pausedCommitments.length > 0 && (
+        <div className="flex flex-col gap-4 mt-2">
+          <details className="group">
+            <summary className="flex items-center justify-between cursor-pointer list-none py-2 outline-none">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider group-open:text-foreground transition-colors">
+                Compromisos Pausados
+              </h2>
+              <span className="text-xs font-semibold bg-muted px-2.5 py-1 rounded-full text-muted-foreground group-open:bg-primary/10 group-open:text-primary transition-colors">
+                {pausedCommitments.length}
+              </span>
+            </summary>
+            <div className="flex flex-col gap-3 mt-4 animate-in fade-in slide-in-from-top-2 duration-300">
+              {pausedCommitments.map(commitment => (
+                <PausedCommitmentCard key={commitment.id} commitment={commitment} />
+              ))}
+            </div>
+          </details>
+        </div>
+      )}
+
+      {/* FAB removed: Now handled by central BottomNav button */}
 
       {/* Simulator */}
       {showSimulator && (
@@ -215,7 +227,7 @@ export default function PlanningPage() {
           month={selectedMonth}
           year={selectedYear}
           initialPeriod={selectedPeriod}
-          commitments={fullMonthEntries.map(e => e.commitment)}
+          commitments={fullMonthEntries}
           onClose={() => setShowSimulator(false)}
         />
       )}

@@ -6,6 +6,7 @@ import { ArrowLeft, History, Search, SlidersHorizontal, X, Download } from 'luci
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
 import { formatMoney } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { TransactionCard } from '@/components/transactions/TransactionCard';
 import { ExportModal } from '@/components/transactions/ExportModal';
 import { Input } from '@/components/ui/input';
@@ -311,12 +312,12 @@ export default function TransactionsPage() {
                   {formatDateGroup(group.dateObj)}
                 </h3>
                 <div className="flex flex-col items-end">
-                  <span className="text-xs font-semibold text-foreground">
-                    Balance del día: {trueDailyBalance < 0 ? '-' : ''}{formatMoney(Math.abs(trueDailyBalance))}
+                  <span className="text-xs font-semibold text-foreground flex items-center gap-1">
+                    Balance del día: {trueDailyBalance < 0 ? '-' : ''}<MoneyDisplay amount={Math.abs(trueDailyBalance)} />
                   </span>
                   {hasActiveFilters && (
-                    <span className="text-[10px] font-medium text-muted-foreground mt-0.5">
-                      Movimientos: {groupSubtotal < 0 ? '-' : (groupSubtotal > 0 ? '+' : '')}{formatMoney(Math.abs(groupSubtotal))}
+                    <span className="text-[10px] font-medium text-muted-foreground mt-0.5 flex items-center gap-1">
+                      Movimientos: {groupSubtotal < 0 ? '-' : (groupSubtotal > 0 ? '+' : '')}<MoneyDisplay amount={Math.abs(groupSubtotal)} />
                     </span>
                   )}
                 </div>

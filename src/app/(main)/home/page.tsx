@@ -7,10 +7,11 @@ import Link from 'next/link';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { formatMoney, formatMoneyCompact, cn } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { DailyVerseCard } from '@/features/daily-verse/components/DailyVerseCard';
 import { TransactionCard } from '@/components/transactions/TransactionCard';
 import { NextCommitmentCard } from '@/features/planning/components/NextCommitmentCard';
-import { commitmentAppliesToMonth, getDueDateForMonth } from '@/features/planning/utils/dateUtils';
+import { generateInstallmentsForMonth } from '@/features/planning/utils/dateUtils';
 import type { FinancialCommitment } from '@/lib/db';
 import { PlanningModeModal } from '@/components/onboarding/PlanningModeModal';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
@@ -88,7 +89,11 @@ export default function HomePage() {
   const incomes = filteredTx.filter(t => t.type === 'INCOME' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
   const expenses = filteredTx.filter(t => t.type === 'EXPENSE' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
 
-  const activeSeedsCount = useLiveQuery(() => db.seedGoals.where('status').equals('ACTIVE').count()) || 0;
+  const activeSeedsCount = useLiveQuery(() => 
+    db.seedGoals
+      .filter(seed => seed.status === 'ACTIVE' && !seed.deletedAt)
+      .count()
+  ) || 0;
 
   const user = useLiveQuery(() => db.users.orderBy('id').first());
   const userName = user?.name ? user.name.split(' ')[0] : 'Usuario';
@@ -128,10 +133,13 @@ export default function HomePage() {
     let best: { commitment: FinancialCommitment; dueDate: Date } | null = null;
     for (const { m, y } of searchMonths) {
       for (const c of all) {
-        if (!commitmentAppliesToMonth(c, m, y)) continue;
-        const dueDate = getDueDateForMonth(c, m, y);
-        if (!dueDate || dueDate < now) continue;
-        if (!best || dueDate < best.dueDate) best = { commitment: c, dueDate };
+        const generated = generateInstallmentsForMonth(c, m, y);
+        for (const inst of generated) {
+          if (inst.dueDate < now) continue;
+          if (!best || inst.dueDate < best.dueDate) {
+            best = { commitment: c, dueDate: inst.dueDate };
+          }
+        }
       }
       if (best) break;
     }
@@ -155,7 +163,7 @@ export default function HomePage() {
       >
         <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Balance Total</span>
         <h2 className="text-4xl sm:text-5xl font-bold tracking-tighter text-foreground truncate max-w-full transition-all duration-300">
-          {expandedSection === 'balance' ? formatMoney(totalBalance) : formatMoneyCompact(totalBalance)}
+          {expandedSection === 'balance' ? <MoneyDisplay amount={totalBalance} /> : <MoneyDisplay amount={totalBalance} compact />}
         </h2>
       </div>
 
@@ -184,8 +192,8 @@ export default function HomePage() {
                 </div>
                 <span className="text-xs font-semibold uppercase tracking-wider truncate">Ingresos</span>
               </div>
-              <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300">
-                {expandedSection === 'incomes' ? formatMoney(incomes) : formatMoneyCompact(incomes)}
+              <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300 flex items-center">
+                {expandedSection === 'incomes' ? <MoneyDisplay amount={incomes} /> : <MoneyDisplay amount={incomes} compact />}
               </span>
             </CardContent>
           </Card>
@@ -201,8 +209,8 @@ export default function HomePage() {
                 </div>
                 <span className="text-xs font-semibold uppercase tracking-wider truncate">Gastos</span>
               </div>
-              <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300">
-                {expandedSection === 'expenses' ? formatMoney(expenses) : formatMoneyCompact(expenses)}
+              <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300 flex items-center">
+                {expandedSection === 'expenses' ? <MoneyDisplay amount={expenses} /> : <MoneyDisplay amount={expenses} compact />}
               </span>
             </CardContent>
           </Card>
@@ -226,8 +234,8 @@ export default function HomePage() {
                 </div>
                 <span className="text-xs font-semibold uppercase tracking-wider truncate">Diezmo</span>
               </div>
-              <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300">
-                {expandedSection === 'tithe' ? formatMoney(pendingTithe) : formatMoneyCompact(pendingTithe)}
+              <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300 flex items-center">
+                {expandedSection === 'tithe' ? <MoneyDisplay amount={pendingTithe} /> : <MoneyDisplay amount={pendingTithe} compact />}
               </span>
               <span className="text-[10px] text-muted-foreground truncate">Pendiente</span>
             </CardContent>

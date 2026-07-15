@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Pencil, Trash2, History } from 'lucide-react';
+import { ArrowLeft, Pencil, Trash2, History, PauseCircle } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useCommitment, useCommitmentPayments } from '@/features/planning/hooks/usePlanningData';
 import { PaymentHistorySheet } from '@/features/planning/components/PaymentHistorySheet';
 import { PlanningService } from '@/features/planning/services/planningService';
 import { formatMoney } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { COMMITMENT_TYPE_LABELS, PERIODICITY_LABELS, STATUS_LABELS } from '@/features/planning/types';
 import { formatFullDate } from '@/features/planning/utils/dateUtils';
 import Link from 'next/link';
@@ -26,12 +27,63 @@ export default function CommitmentDetailPage() {
   const [showHistory, setShowHistory] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [showPauseModal, setShowPauseModal] = useState(false);
+  const [pausePeriods, setPausePeriods] = useState<number | ''>('');
+  const [pausing, setPausing] = useState(false);
 
-  const handleDelete = async () => {
+  const handlePause = async (indefinite: boolean) => {
+    if (pausing) return;
+    
+    let untilDate: string | null = null;
+    
+    if (!indefinite) {
+      if (typeof pausePeriods !== 'number' || pausePeriods <= 0) {
+         alert("Por favor ingresa un número válido mayor a 0.");
+         return;
+      }
+      const now = new Date();
+      if (commitment?.periodicity === 'MONTHLY') {
+        now.setMonth(now.getMonth() + pausePeriods);
+      } else if (commitment?.periodicity === 'WEEKLY') {
+        now.setDate(now.getDate() + (pausePeriods * 7));
+      } else if (commitment?.periodicity === 'BIWEEKLY') {
+        now.setDate(now.getDate() + (pausePeriods * 14));
+      } else if (commitment?.periodicity === 'DAILY') {
+        now.setDate(now.getDate() + pausePeriods);
+      } else if (commitment?.periodicity === 'YEARLY') {
+        now.setFullYear(now.getFullYear() + pausePeriods);
+      }
+      untilDate = now.toISOString();
+    }
+    
+    setPausing(true);
+    try {
+      await PlanningService.pauseCommitment(id, untilDate);
+      setShowPauseModal(false);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setPausing(false);
+    }
+  };
+
+  const handleHardDelete = async () => {
     if (deleting) return;
     setDeleting(true);
     try {
-      await PlanningService.cancelCommitment(id);
+      await PlanningService.hardDeleteCommitment(id);
+      router.replace('/planning');
+    } catch (e) {
+      console.error(e);
+      setDeleting(false);
+    }
+  };
+
+  const handleCancelFuture = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await PlanningService.cancelFutureCommitments(id);
       router.replace('/planning');
     } catch (e) {
       console.error(e);
@@ -86,8 +138,8 @@ export default function CommitmentDetailPage() {
             <p className="text-xs text-muted-foreground uppercase tracking-wider font-semibold mb-1">
               {commitment.isRecurring ? 'Monto mensual' : 'Por cuota'}
             </p>
-            <p className="text-3xl font-bold text-foreground">
-              {formatMoney(commitment.installmentAmount)}
+            <p className="text-3xl font-bold text-foreground flex items-center">
+              <MoneyDisplay amount={commitment.installmentAmount} />
             </p>
           </div>
           <div className="text-right">
@@ -111,7 +163,7 @@ export default function CommitmentDetailPage() {
             <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
               <span>Cuota {commitment.currentInstallment} de {commitment.installments}</span>
               {commitment.remainingAmount !== null && (
-                <span>Resta {formatMoney(commitment.remainingAmount)}</span>
+                <span className="flex items-center gap-1">Resta <MoneyDisplay amount={commitment.remainingAmount} /></span>
               )}
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
@@ -148,8 +200,8 @@ export default function CommitmentDetailPage() {
               <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
                 Total comprometido
               </p>
-              <p className="text-sm font-semibold text-foreground">
-                {formatMoney(commitment.amountTotal)}
+              <p className="text-sm font-semibold text-foreground flex items-center">
+                <MoneyDisplay amount={commitment.amountTotal} />
               </p>
             </div>
           )}
@@ -188,13 +240,22 @@ export default function CommitmentDetailPage() {
         </button>
 
         {commitment.status === 'ACTIVE' && (
-          <button
-            onClick={() => setShowDeleteConfirm(true)}
-            className="w-full flex items-center justify-center gap-2 h-12 rounded-2xl text-destructive text-sm font-semibold hover:bg-destructive/5 transition-colors border border-destructive/20"
-          >
-            <Trash2 className="w-4 h-4" />
-            Cancelar compromiso
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowPauseModal(true)}
+              className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl text-primary text-sm font-semibold hover:bg-primary/5 transition-colors border border-primary/20"
+            >
+              <PauseCircle className="w-4 h-4" />
+              Pausar
+            </button>
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              className="flex-1 flex items-center justify-center gap-2 h-12 rounded-2xl text-destructive text-sm font-semibold hover:bg-destructive/5 transition-colors border border-destructive/20"
+            >
+              <Trash2 className="w-4 h-4" />
+              Eliminar
+            </button>
+          </div>
         )}
       </div>
 
@@ -215,20 +276,95 @@ export default function CommitmentDetailPage() {
               <div className="mx-auto w-12 h-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
                 <Trash2 className="w-5 h-5" />
               </div>
-              <h3 className="text-xl font-semibold mb-2">¿Cancelar compromiso?</h3>
+              <h3 className="text-xl font-semibold mb-2">Eliminar compromiso</h3>
               <p className="text-sm text-muted-foreground mb-6">
-                Se marcará como cancelado y dejará de aparecer en tu planificación.
+                Elige cómo deseas proceder. Esta acción no se puede deshacer.
               </p>
-              <div className="flex flex-col gap-3">
+              
+              <div className="flex flex-col gap-3 text-left">
                 <button
-                  onClick={handleDelete}
+                  onClick={handleCancelFuture}
                   disabled={deleting}
-                  className="w-full h-12 rounded-full bg-destructive text-destructive-foreground font-semibold text-sm hover:bg-destructive/90 transition-colors"
+                  className="w-full p-3 rounded-2xl border border-border hover:bg-muted transition-colors"
                 >
-                  {deleting ? 'Cancelando...' : 'Sí, cancelar'}
+                  <p className="font-semibold text-sm">Cancelar futuros</p>
+                  <p className="text-xs text-muted-foreground mt-1">Conserva el historial de cuotas pagadas pero no genera más a futuro. Lo marca como cancelado.</p>
                 </button>
+
+                <button
+                  onClick={handleHardDelete}
+                  disabled={deleting}
+                  className="w-full p-3 rounded-2xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors"
+                >
+                  <p className="font-semibold text-sm text-destructive">Eliminar completamente</p>
+                  <p className="text-xs text-muted-foreground mt-1">Elimina todo rastro, cuotas, e historial de pagos. ¡Acción irreversible!</p>
+                </button>
+              </div>
+
+              <div className="mt-6">
                 <button
                   onClick={() => setShowDeleteConfirm(false)}
+                  disabled={deleting}
+                  className="w-full h-12 rounded-full border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
+                >
+                  Volver
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pause Modal */}
+      {showPauseModal && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border shadow-lg rounded-3xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-primary/10 text-primary rounded-full flex items-center justify-center mb-4">
+                <PauseCircle className="w-5 h-5" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Pausar compromiso</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                El compromiso no generará cuotas durante este tiempo.
+              </p>
+              
+              <div className="flex flex-col gap-3 text-left">
+                <button
+                  onClick={() => handlePause(true)}
+                  disabled={pausing}
+                  className="w-full p-3 rounded-2xl border border-border hover:bg-muted transition-colors"
+                >
+                  <p className="font-semibold text-sm">Pausa indefinida</p>
+                  <p className="text-xs text-muted-foreground mt-1">Hasta que lo reactives manualmente.</p>
+                </button>
+
+                <div className="p-3 rounded-2xl border border-border flex flex-col gap-2">
+                  <p className="font-semibold text-sm">Pausar temporalmente</p>
+                  <div className="flex items-center gap-3">
+                    <input 
+                      type="number" 
+                      min="1" 
+                      max="12" 
+                      value={pausePeriods}
+                      onChange={(e) => setPausePeriods(e.target.value === '' ? '' : Number(e.target.value))}
+                      className="w-16 h-10 rounded-lg border border-border bg-background px-3 text-sm text-center"
+                    />
+                    <span className="text-sm text-muted-foreground">períodos</span>
+                  </div>
+                  <button
+                    onClick={() => handlePause(false)}
+                    disabled={pausing}
+                    className="mt-2 w-full h-10 rounded-xl bg-primary text-primary-foreground font-semibold text-sm hover:bg-primary/90 transition-colors"
+                  >
+                    Pausar
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowPauseModal(false)}
+                  disabled={pausing}
                   className="w-full h-12 rounded-full border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
                 >
                   Volver

@@ -87,6 +87,7 @@
   --radius-xl: calc(var(--radius) + 4px);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-numbers: var(--font-outfit);
 }
 
 @layer base {

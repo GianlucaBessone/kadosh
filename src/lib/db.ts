@@ -201,6 +201,12 @@ export interface FinancialCommitment {
   isRecurring: boolean;
   endDate: string | null;
   notes: string | null;
+  /** Días entre cuotas para periodicidad personalizada */
+  customPeriodicityDays?: number | null;
+  /** Nombre para tipo de compromiso personalizado */
+  customTypeName?: string | null;
+  /** Fecha hasta la cual está pausado el compromiso */
+  pausedUntil?: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -250,6 +256,19 @@ export interface Metadata {
   deviceId: string | null;
 }
 
+export interface SystemConfig {
+  key: string;
+  value: string;
+}
+
+export interface MotivationalVerse {
+  id: string;
+  text: string;
+  reference: string;
+  category: 'AHORRO' | 'DIEZMO';
+  createdAt: string;
+}
+
 export class KadoshDB extends Dexie {
   users!: EntityTable<User, 'id'>;
   settings!: EntityTable<Settings, 'id'>;
@@ -265,6 +284,8 @@ export class KadoshDB extends Dexie {
   metadata!: EntityTable<Metadata, 'id'>;
   financialCommitments!: EntityTable<FinancialCommitment, 'id'>;
   commitmentPayments!: EntityTable<CommitmentPayment, 'id'>;
+  systemConfig!: EntityTable<SystemConfig, 'key'>;
+  motivationalVerses!: EntityTable<MotivationalVerse, 'id'>;
 
   constructor() {
     super('KadoshDB');
@@ -281,8 +302,10 @@ export class KadoshDB extends Dexie {
       notifications: 'id, userId, read',
       syncQueue: 'id, status, tableName, recordId',
       metadata: 'id',
-      financialCommitments: 'id, ownerId, status, type, dayOfMonth, firstDueDate',
-      commitmentPayments: 'id, commitmentId, date, installmentNumber',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
     });
     this.version(5).stores({
       users: 'id, email, isCloudLinked',
@@ -363,7 +386,8 @@ export async function clearAllUserData() {
   await db.transaction('rw', [
     db.users, db.settings, db.accounts, db.categories, db.transactions,
     db.seedGoals, db.seedContributions, db.tithes, db.notifications,
-    db.syncQueue, db.metadata, db.financialCommitments, db.commitmentPayments
+    db.syncQueue, db.metadata, db.financialCommitments, db.commitmentPayments,
+    db.motivationalVerses
   ], async () => {
     await db.users.clear();
     await db.settings.clear();
@@ -378,5 +402,6 @@ export async function clearAllUserData() {
     await db.metadata.clear();
     await db.financialCommitments.clear();
     await db.commitmentPayments.clear();
+    await db.motivationalVerses.clear();
   });
 }

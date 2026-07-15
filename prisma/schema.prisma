@@ -187,3 +187,12 @@ model NotificationIntent {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 }
+
+model InactivityTracker {
+  id              String   @id @default(uuid()) @db.Uuid
+  userHash        String   @unique // Same as deviceId or OneSignal external_id
+  accumulatedDays Int      @default(0)
+  lastPulseAt     DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}

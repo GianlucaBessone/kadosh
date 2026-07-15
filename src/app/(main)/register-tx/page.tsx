@@ -12,12 +12,14 @@ import { useState, useEffect } from 'react';
 import { TransactionService } from '@/services/transactionService';
 import { db } from '@/lib/db';
 import { MoneyInput } from '@/components/ui/MoneyInput';
+import { MotivationalModal } from '@/components/transactions/MotivationalModal';
 
 export default function RegisterTransactionPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
+  const [showMotivationalModal, setShowMotivationalModal] = useState(false);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,6 +77,25 @@ export default function RegisterTransactionPage() {
         date: new Date(dateStr).toISOString(),
         notes,
       });
+
+      if (type === 'INCOME') {
+        const now = new Date();
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+        
+        const previousIncomesThisMonth = await db.transactions
+          .where('date').aboveOrEqual(startOfMonth)
+          .filter(t => t.type === 'INCOME' && t.categoryId !== 'seed_transfer')
+          .count();
+          
+        const activeSeeds = await db.seedGoals.filter(s => s.status !== 'HARVESTED').count();
+        const activeTithes = await db.tithes.where('[month+year]').equals([now.getMonth() + 1, now.getFullYear()]).count();
+        
+        if (previousIncomesThisMonth <= 1 && activeSeeds === 0 && activeTithes === 0) {
+          setShowMotivationalModal(true);
+          setLoading(false);
+          return;
+        }
+      }
 
       router.push('/home');
     } catch (error) {
@@ -234,6 +255,10 @@ export default function RegisterTransactionPage() {
         </TabsContent>
 
       </Tabs>
+
+      {showMotivationalModal && (
+        <MotivationalModal onClose={() => router.push('/home')} />
+      )}
     </div>
   )
 }

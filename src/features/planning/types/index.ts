@@ -17,11 +17,17 @@ export {
 export type PlanningPeriod = 'MONTH' | 'Q1' | 'Q2';
 
 
+export interface MonthlyCommitmentItem {
+  commitment: import('@/lib/db').FinancialCommitment;
+  dueDate: Date;
+  installmentIndex: number;
+}
+
 /** Result of simulating a month's financial balance */
 export interface MonthlySimulation {
   month: number; // 1-12
   year: number;
-  commitments: import('@/lib/db').FinancialCommitment[];
+  commitments: MonthlyCommitmentItem[];
   totalCommitted: number;
   incomeExpected: number;
   additionalIncome: number;

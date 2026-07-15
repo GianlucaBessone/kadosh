@@ -12,6 +12,8 @@ import { TitheService } from '@/services/titheService'
 import { useState, useEffect } from 'react'
 import { formatMoney } from '@/lib/utils'
 import { MoneyInput } from '@/components/ui/MoneyInput'
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
+import { MotivationalVerseService } from '@/services/motivationalVerseService'
 
 export default function TithePage() {
   const [loading, setLoading] = useState(false);
@@ -21,6 +23,7 @@ export default function TithePage() {
   const [tempPct, setTempPct] = useState<string>('10');
   const [tempAmt, setTempAmt] = useState<string>('');
   const [isFlipped, setIsFlipped] = useState(false);
+  const [verse, setVerse] = useState<{ text: string, reference: string } | null>(null);
 
   useEffect(() => {
     const savedPct = localStorage.getItem('kadosh_tithe_pct');
@@ -42,6 +45,12 @@ export default function TithePage() {
       }, 1000);
       return () => clearTimeout(timer);
     }
+  }, []);
+
+  useEffect(() => {
+    MotivationalVerseService.seedDefaultVerses().then(() => {
+      MotivationalVerseService.getRandomVerse('DIEZMO').then(setVerse);
+    });
   }, []);
 
   const handleSaveConfig = (mode: 'pct' | 'amt') => {
@@ -173,7 +182,7 @@ export default function TithePage() {
               <div className="flex justify-between items-end gap-2">
                 <div className="flex flex-col min-w-0">
                   <span className="text-[clamp(0.65rem,2.5vw,0.75rem)] font-semibold uppercase tracking-wider text-muted-foreground mb-1 whitespace-nowrap">Pendiente</span>
-                  <span className="text-[clamp(1.5rem,7vw,2.25rem)] font-bold text-foreground whitespace-nowrap">{formatMoney(pending)}</span>
+                  <span className="text-[clamp(1.5rem,7vw,2.25rem)] font-bold text-foreground whitespace-nowrap flex items-center"><MoneyDisplay amount={pending} /></span>
                 </div>
                 <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
                   <DialogTrigger asChild>
@@ -182,7 +191,7 @@ export default function TithePage() {
                         <span>Sugerido ({customFixedAmount !== null ? 'Fijo' : `${actualPercentage}%`})</span>
                         <Settings2 className="w-3 h-3 flex-shrink-0" />
                       </div>
-                      <span className="text-[clamp(1rem,4.5vw,1.125rem)] font-medium text-gold whitespace-nowrap">{formatMoney(suggestedTithe)}</span>
+                      <span className="text-[clamp(1rem,4.5vw,1.125rem)] font-medium text-gold whitespace-nowrap flex items-center justify-end"><MoneyDisplay amount={suggestedTithe} /></span>
                     </div>
                   </DialogTrigger>
                   <DialogContent className="sm:max-w-md rounded-3xl p-6">
@@ -238,8 +247,8 @@ export default function TithePage() {
 
               <div className="space-y-2 mt-2">
                 <div className="flex justify-between text-[clamp(0.65rem,2.5vw,0.75rem)] text-muted-foreground gap-2">
-                  <span className="whitespace-nowrap truncate">Entregado: {formatMoney(totalPaid)}</span>
-                  <span className="whitespace-nowrap truncate">Ingresos: {formatMoney(incomes)}</span>
+                  <span className="whitespace-nowrap truncate flex items-center gap-1">Entregado: <MoneyDisplay amount={totalPaid} /></span>
+                  <span className="whitespace-nowrap truncate flex items-center gap-1">Ingresos: <MoneyDisplay amount={incomes} /></span>
                 </div>
                 <div className="h-2 w-full bg-gold/20 rounded-full overflow-hidden">
                   <div className="h-full bg-gold rounded-full transition-all duration-1000" style={{ width: `${progressPercent}%` }} />
@@ -271,10 +280,10 @@ export default function TithePage() {
             </div>
             <div className="relative z-10 flex flex-col items-center text-center space-y-4 max-w-[280px]">
               <p className="text-[13px] md:text-sm italic text-foreground/90 leading-relaxed font-medium">
-                "Traigan íntegro el diezmo para los fondos del templo, y así habrá alimento en mi casa. Pruébenme en esto —dice el Señor Todopoderoso—, y vean si no abro las compuertas del cielo y derramo sobre ustedes bendición hasta que sobreabunde."
+                "{verse?.text || 'Traigan íntegro el diezmo para los fondos del templo, y así habrá alimento en mi casa. Pruébenme en esto —dice el Señor Todopoderoso—, y vean si no abro las compuertas del cielo y derramo sobre ustedes bendición hasta que sobreabunde.'}"
               </p>
               <p className="text-[10px] md:text-xs font-bold text-gold tracking-widest uppercase">
-                Malaquías 3:10
+                {verse?.reference || 'Malaquías 3:10'}
               </p>
             </div>
             
@@ -335,7 +344,7 @@ export default function TithePage() {
                   {monthNames[tithe.month - 1]} {tithe.year}
                 </p>
               </div>
-              <span className="font-semibold text-gold">+ {formatMoney(tithe.amount)}</span>
+              <span className="font-semibold text-gold flex items-center">+ <MoneyDisplay amount={tithe.amount} className="ml-1" /></span>
             </div>
           ))}
         </div>

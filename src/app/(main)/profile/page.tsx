@@ -248,6 +248,11 @@ export default function ProfilePage() {
     }
   };
 
+  const handleRepeatOnboarding = () => {
+    localStorage.removeItem('kadosh_onboarding_done');
+    router.push('/registro');
+  };
+
   return (
     <>
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -431,6 +436,23 @@ export default function ProfilePage() {
                 </button>
               </TooltipTrigger>
               <TooltipContent>Bloquea la app y vuelve al PIN</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleRepeatOnboarding}
+                  className="w-full flex items-center justify-between p-4 hover:bg-primary/5 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 text-primary">
+                    <div className="bg-primary/10 p-2 rounded-full">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-medium">Repetir Tutorial</span>
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Vuelve a ver la guía de introducción</TooltipContent>
             </Tooltip>
 
           </CardContent>

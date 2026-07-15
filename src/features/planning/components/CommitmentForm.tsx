@@ -86,10 +86,14 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
   const [reminderDays, setReminderDays] = useState(initial?.reminderDaysBefore ?? 3);
   const [reminderTime, setReminderTime] = useState(initial?.reminderTime ?? '08:00');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [customTypeName, setCustomTypeName] = useState(initial?.customTypeName ?? '');
+  const [customPeriodicityDays, setCustomPeriodicityDays] = useState(initial?.customPeriodicityDays?.toString() ?? '');
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
 
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const settings = useLiveQuery(() => db.settings.where('userId').equals(ownerId).first());
+  const isBiweeklyMode = settings?.planningMode === 'BIWEEKLY';
 
   // Real-time calculation for Mode A
   useEffect(() => {
@@ -127,7 +131,10 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
       description: description || null,
       hasReminder,
       reminderDaysBefore: reminderDays,
+      reminderTime: reminderTime,
       notes: notes || null,
+      customTypeName: type === CommitmentType.CUSTOM ? customTypeName : null,
+      customPeriodicityDays: periodicity === CommitmentPeriodicity.CUSTOM && customPeriodicityDays ? parseInt(customPeriodicityDays) : null,
     };
 
     const result = validateCommitmentForm(formData);
@@ -159,6 +166,8 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
         isRecurring: formData.isRecurring,
         endDate: null,
         notes: formData.notes,
+        customTypeName: formData.customTypeName,
+        customPeriodicityDays: formData.customPeriodicityDays,
         notificationIntentId: initial?.notificationIntentId || null,
       };
 
@@ -251,6 +260,18 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
             </button>
           ))}
         </div>
+        {type === CommitmentType.CUSTOM && (
+          <div className="mt-3">
+            <input
+              type="text"
+              value={customTypeName}
+              onChange={e => setCustomTypeName(e.target.value)}
+              placeholder="Ej: Suscripción Escolar..."
+              className={inputClass}
+            />
+            {errors.customTypeName && <p className="text-xs text-destructive mt-1.5">{errors.customTypeName}</p>}
+          </div>
+        )}
       </Field>
 
       {/* Periodicidad */}
@@ -266,7 +287,31 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
             ))}
           </select>
 
-          {periodicity === CommitmentPeriodicity.BIWEEKLY && (
+          {periodicity === CommitmentPeriodicity.CUSTOM && (
+            <div className="mt-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                Cada cuántos días
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={customPeriodicityDays}
+                onChange={e => setCustomPeriodicityDays(e.target.value)}
+                placeholder="Ej: 17"
+                className={inputClass}
+              />
+              {errors.customPeriodicityDays && <p className="text-xs text-destructive mt-1.5">{errors.customPeriodicityDays}</p>}
+            </div>
+          )}
+
+          {isBiweeklyMode && [
+            CommitmentPeriodicity.MONTHLY,
+            CommitmentPeriodicity.BIMONTHLY,
+            CommitmentPeriodicity.QUARTERLY,
+            CommitmentPeriodicity.SEMIANNUAL,
+            CommitmentPeriodicity.YEARLY
+          ].includes(periodicity) && (
             <div className="grid grid-cols-2 gap-2 mt-1">
               <button
                 type="button"
