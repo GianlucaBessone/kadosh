@@ -7,6 +7,7 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { CommitmentType, CommitmentPeriodicity } from '@/lib/db';
 import type { FinancialCommitment } from '@/lib/db';
 import { COMMITMENT_TYPE_LABELS, PERIODICITY_LABELS } from '../types';
+import type { PlanningPeriod } from '../types';
 import { validateCommitmentForm } from '../validators/commitmentValidator';
 import type { CommitmentFormData } from '../validators/commitmentValidator';
 import { calcInstallmentAmount, calcTotalAmount } from '../utils/amountUtils';
@@ -66,6 +67,9 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
   const [periodicity, setPeriodicity] = useState<CommitmentPeriodicity>(
     initial?.periodicity ?? CommitmentPeriodicity.MONTHLY
   );
+  const [biweeklyPeriod, setBiweeklyPeriod] = useState<'Q1' | 'Q2'>(
+    initial?.biweeklyPeriod ?? 'Q1'
+  );
   const [firstDueDate, setFirstDueDate] = useState(
     initial?.firstDueDate ? initial.firstDueDate.split('T')[0] : getLocalYYYYMMDD(new Date())
   );
@@ -82,10 +86,14 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
   const [reminderDays, setReminderDays] = useState(initial?.reminderDaysBefore ?? 3);
   const [reminderTime, setReminderTime] = useState(initial?.reminderTime ?? '08:00');
   const [notes, setNotes] = useState(initial?.notes ?? '');
+  const [customTypeName, setCustomTypeName] = useState(initial?.customTypeName ?? '');
+  const [customPeriodicityDays, setCustomPeriodicityDays] = useState(initial?.customPeriodicityDays?.toString() ?? '');
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
 
   const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
+  const settings = useLiveQuery(() => db.settings.where('userId').equals(ownerId).first());
+  const isBiweeklyMode = settings?.planningMode === 'BIWEEKLY';
 
   // Real-time calculation for Mode A
   useEffect(() => {
@@ -123,7 +131,10 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
       description: description || null,
       hasReminder,
       reminderDaysBefore: reminderDays,
+      reminderTime: reminderTime,
       notes: notes || null,
+      customTypeName: type === CommitmentType.CUSTOM ? customTypeName : null,
+      customPeriodicityDays: periodicity === CommitmentPeriodicity.CUSTOM && customPeriodicityDays ? parseInt(customPeriodicityDays) : null,
     };
 
     const result = validateCommitmentForm(formData);
@@ -146,6 +157,7 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
         installments: formData.installments,
         remainingAmount: formData.amountTotal,
         periodicity: formData.periodicity,
+        biweeklyPeriod: formData.periodicity === CommitmentPeriodicity.BIWEEKLY ? biweeklyPeriod : undefined,
         firstDueDate: new Date(formData.firstDueDate).toISOString(),
         dayOfMonth: formData.dayOfMonth,
         hasReminder: formData.hasReminder,
@@ -154,6 +166,8 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
         isRecurring: formData.isRecurring,
         endDate: null,
         notes: formData.notes,
+        customTypeName: formData.customTypeName,
+        customPeriodicityDays: formData.customPeriodicityDays,
         notificationIntentId: initial?.notificationIntentId || null,
       };
 
@@ -246,19 +260,86 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
             </button>
           ))}
         </div>
+        {type === CommitmentType.CUSTOM && (
+          <div className="mt-3">
+            <input
+              type="text"
+              value={customTypeName}
+              onChange={e => setCustomTypeName(e.target.value)}
+              placeholder="Ej: Suscripción Escolar..."
+              className={inputClass}
+            />
+            {errors.customTypeName && <p className="text-xs text-destructive mt-1.5">{errors.customTypeName}</p>}
+          </div>
+        )}
       </Field>
 
       {/* Periodicidad */}
       <Field label="Periodicidad" error={errors.periodicity}>
-        <select
-          value={periodicity}
-          onChange={e => setPeriodicity(e.target.value as CommitmentPeriodicity)}
-          className={selectClass}
-        >
-          {Object.entries(PERIODICITY_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-3">
+          <select
+            value={periodicity}
+            onChange={e => setPeriodicity(e.target.value as CommitmentPeriodicity)}
+            className={selectClass}
+          >
+            {Object.entries(PERIODICITY_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+
+          {periodicity === CommitmentPeriodicity.CUSTOM && (
+            <div className="mt-1">
+              <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider block mb-1.5">
+                Cada cuántos días
+              </label>
+              <input
+                type="number"
+                inputMode="numeric"
+                min={1}
+                value={customPeriodicityDays}
+                onChange={e => setCustomPeriodicityDays(e.target.value)}
+                placeholder="Ej: 17"
+                className={inputClass}
+              />
+              {errors.customPeriodicityDays && <p className="text-xs text-destructive mt-1.5">{errors.customPeriodicityDays}</p>}
+            </div>
+          )}
+
+          {isBiweeklyMode && [
+            CommitmentPeriodicity.MONTHLY,
+            CommitmentPeriodicity.BIMONTHLY,
+            CommitmentPeriodicity.QUARTERLY,
+            CommitmentPeriodicity.SEMIANNUAL,
+            CommitmentPeriodicity.YEARLY
+          ].includes(periodicity) && (
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setBiweeklyPeriod('Q1')}
+                className={cn(
+                  'h-10 rounded-xl text-xs font-semibold border transition-all duration-150',
+                  biweeklyPeriod === 'Q1'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted text-muted-foreground border-transparent hover:text-foreground'
+                )}
+              >
+                1.ª Quincena
+              </button>
+              <button
+                type="button"
+                onClick={() => setBiweeklyPeriod('Q2')}
+                className={cn(
+                  'h-10 rounded-xl text-xs font-semibold border transition-all duration-150',
+                  biweeklyPeriod === 'Q2'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted text-muted-foreground border-transparent hover:text-foreground'
+                )}
+              >
+                2.ª Quincena
+              </button>
+            </div>
+          )}
+        </div>
       </Field>
 
       {/* Primer vencimiento */}

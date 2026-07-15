@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import {
   User, Moon, Bell, Download, LogOut, BookOpen,
-  Camera, Mail, Sun, ChevronRight, Loader2,
+  Camera, Mail, Sun, ChevronRight, Loader2, CalendarDays,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -248,6 +248,11 @@ export default function ProfilePage() {
     }
   };
 
+  const handleRepeatOnboarding = () => {
+    localStorage.removeItem('kadosh_onboarding_done');
+    router.push('/registro');
+  };
+
   return (
     <>
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -347,6 +352,47 @@ export default function ProfilePage() {
         </Card>
       </div>
 
+      {/* ── Planificación Financiera ───────────────────────────────────── */}
+      <div className="space-y-4">
+        <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground ml-2">
+          Planificación Financiera
+        </h3>
+        <Card className="rounded-3xl border-border/50 shadow-sm overflow-hidden">
+          <CardContent className="p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-primary/10 p-2 rounded-full text-primary">
+                <CalendarDays className="w-4 h-4" />
+              </div>
+              <Label className="text-sm font-medium">
+                Modo de Planificación
+              </Label>
+            </div>
+            <div className="flex items-center gap-2 w-full mt-1">
+              <Button 
+                variant={settings?.planningMode === 'MONTHLY' || !settings?.planningMode ? 'default' : 'outline'} 
+                className="w-full font-semibold rounded-xl"
+                onClick={() => updateSetting({ planningMode: 'MONTHLY' })}
+              >
+                Mensual
+              </Button>
+              <Button 
+                variant={settings?.planningMode === 'BIWEEKLY' ? 'default' : 'outline'} 
+                className="w-full font-semibold rounded-xl"
+                onClick={() => updateSetting({ planningMode: 'BIWEEKLY' })}
+              >
+                Quincenal
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1 px-1">
+              {settings?.planningMode === 'BIWEEKLY' 
+                ? 'Los indicadores y balances se calcularán por quincena (Q1 y Q2).'
+                : 'Todo se organiza y calcula en base al mes calendario completo.'
+              }
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* ── Datos y Cuenta ─────────────────────────────────────────────── */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-muted-foreground ml-2">
@@ -390,6 +436,23 @@ export default function ProfilePage() {
                 </button>
               </TooltipTrigger>
               <TooltipContent>Bloquea la app y vuelve al PIN</TooltipContent>
+            </Tooltip>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={handleRepeatOnboarding}
+                  className="w-full flex items-center justify-between p-4 hover:bg-primary/5 transition-colors text-left"
+                >
+                  <div className="flex items-center gap-3 text-primary">
+                    <div className="bg-primary/10 p-2 rounded-full">
+                      <BookOpen className="w-4 h-4" />
+                    </div>
+                    <span className="text-sm font-medium">Repetir Tutorial</span>
+                  </div>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Vuelve a ver la guía de introducción</TooltipContent>
             </Tooltip>
 
           </CardContent>

@@ -3,9 +3,11 @@ import { db, CommitmentStatus } from '@/lib/db';
 import type { FinancialCommitment, CommitmentPayment } from '@/lib/db';
 import { addToSyncQueue } from '@/services/syncQueueService';
 import { PlanningRepository } from '../repositories/planningRepository';
-import { commitmentAppliesToMonth, getDueDateForMonth } from '../utils/dateUtils';
+import { generateInstallmentsForMonth, getNextDate } from '../utils/dateUtils';
 import { calcProjectedBalance, calcTitheEstimate, calcPercentageCommitted } from '../utils/amountUtils';
-import type { MonthlySimulation } from '../types';
+import type { MonthlySimulation, MonthlyCommitmentItem } from '../types';
+
+// ... (imports) ...
 
 type CreateCommitmentInput = Omit<
   FinancialCommitment,
@@ -55,6 +57,7 @@ export class PlanningService {
 
   /**
    * Soft-deletes (cancels) a commitment and enqueues for sync.
+   * Note: We are migrating to hardDeleteCommitment and cancelFutureCommitments.
    */
   static async cancelCommitment(id: string): Promise<void> {
     const now = new Date().toISOString();
@@ -62,6 +65,120 @@ export class PlanningService {
 
     await db.transaction('rw', db.financialCommitments, db.syncQueue, async () => {
       await PlanningRepository.softDeleteCommitment(id);
+      await addToSyncQueue('FinancialCommitment', id, 'UPDATE', payload);
+    });
+  }
+
+  /**
+   * Hard-deletes a commitment and all associated records (payments, transactions).
+   */
+  static async hardDeleteCommitment(id: string): Promise<void> {
+    const commitment = await PlanningRepository.getCommitmentById(id);
+    if (!commitment) return;
+
+    await db.transaction(
+      'rw',
+      db.financialCommitments,
+      db.commitmentPayments,
+      db.transactions,
+      db.accounts,
+      db.syncQueue,
+      async () => {
+        // 1. Find all payments
+        const payments = await PlanningRepository.getPaymentsForCommitment(id);
+
+        // 2. For each payment, revert transaction and restore balance
+        for (const payment of payments) {
+          if (payment.transactionId) {
+            const tx = await db.transactions.get(payment.transactionId);
+            if (tx) {
+              await db.transactions.delete(payment.transactionId);
+              await addToSyncQueue('Transaction', payment.transactionId, 'DELETE', null);
+
+              const account = await db.accounts.get(tx.accountId);
+              if (account) {
+                const newBalance = account.balance + payment.amount;
+                await db.accounts.update(account.id, { balance: newBalance, updatedAt: new Date().toISOString() });
+                await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: new Date().toISOString() });
+              }
+            }
+          }
+          await db.commitmentPayments.delete(payment.id);
+          await addToSyncQueue('CommitmentPayment', payment.id, 'DELETE', null);
+        }
+
+        // 3. Delete commitment
+        await db.financialCommitments.delete(id);
+        await addToSyncQueue('FinancialCommitment', id, 'DELETE', null);
+      }
+    );
+  }
+
+  /**
+   * Cancels a commitment so it doesn't generate future installments.
+   * Keeps past history (does not set deletedAt).
+   */
+  static async cancelFutureCommitments(id: string): Promise<void> {
+    const commitment = await PlanningRepository.getCommitmentById(id);
+    if (!commitment) return;
+
+    const now = new Date();
+    
+    // 1. End of current month
+    const endOfCurrentMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+    
+    // 2. Date of last paid installment
+    let lastPaidDate = new Date(0);
+    if (commitment.currentInstallment > 0) {
+      lastPaidDate = getNextDate(commitment, new Date(commitment.firstDueDate), commitment.currentInstallment - 1);
+    }
+    
+    // Set endDate to whichever is further in the future
+    const finalEndDate = new Date(Math.max(endOfCurrentMonth.getTime(), lastPaidDate.getTime())).toISOString();
+
+    const payload = { 
+      status: CommitmentStatus.CANCELLED, 
+      endDate: finalEndDate, 
+      updatedAt: now.toISOString() 
+    };
+
+    await db.transaction('rw', db.financialCommitments, db.syncQueue, async () => {
+      // @ts-ignore
+      await db.financialCommitments.update(id, payload);
+      await addToSyncQueue('FinancialCommitment', id, 'UPDATE', payload);
+    });
+  }
+
+  /**
+   * Pauses a commitment indefinitely or until a specific date.
+   */
+  static async pauseCommitment(id: string, untilDate?: string | null): Promise<void> {
+    const now = new Date().toISOString();
+    const payload = { 
+      status: CommitmentStatus.PAUSED, 
+      pausedUntil: untilDate || null, 
+      updatedAt: now 
+    };
+
+    await db.transaction('rw', db.financialCommitments, db.syncQueue, async () => {
+      await db.financialCommitments.update(id, payload as any);
+      await addToSyncQueue('FinancialCommitment', id, 'UPDATE', payload);
+    });
+  }
+
+  /**
+   * Unpauses a commitment.
+   */
+  static async unpauseCommitment(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    const payload = { 
+      status: CommitmentStatus.ACTIVE, 
+      pausedUntil: null, 
+      updatedAt: now 
+    };
+
+    await db.transaction('rw', db.financialCommitments, db.syncQueue, async () => {
+      await db.financialCommitments.update(id, payload as any);
       await addToSyncQueue('FinancialCommitment', id, 'UPDATE', payload);
     });
   }
@@ -226,59 +343,52 @@ export class PlanningService {
   }
 
   /**
-   * Returns all active commitments that apply to a given month/year.
+   * Returns all applicable installments for a given month/year.
    */
   static async getCommitmentsForMonth(
     ownerId: string,
     month: number,
     year: number
-  ): Promise<FinancialCommitment[]> {
-    const all = await PlanningRepository.getActiveCommitments(ownerId);
-    return all.filter(c => commitmentAppliesToMonth(c, month, year));
+  ): Promise<MonthlyCommitmentItem[]> {
+    const all = await PlanningRepository.getAllCommitments(ownerId);
+    const results: MonthlyCommitmentItem[] = [];
+
+    for (const c of all) {
+      const generated = generateInstallmentsForMonth(c, month, year);
+      for (const inst of generated) {
+        results.push({
+          commitment: c,
+          dueDate: inst.dueDate,
+          installmentIndex: inst.installmentIndex
+        });
+      }
+    }
+    
+    return results.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime());
   }
 
   /**
    * Returns the next upcoming commitment by due date.
    */
-  static async getNextCommitment(ownerId: string): Promise<{
-    commitment: FinancialCommitment;
-    dueDate: Date;
-  } | null> {
+  static async getNextCommitment(ownerId: string): Promise<MonthlyCommitmentItem | null> {
     const now = new Date();
+    // Start search from today
+    now.setHours(0, 0, 0, 0);
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
 
-    const thisMonth = await PlanningService.getCommitmentsForMonth(ownerId, month, year);
-    const nextMonth = await PlanningService.getCommitmentsForMonth(ownerId, month === 12 ? 1 : month + 1, month === 12 ? year + 1 : year);
-    const candidates = [...thisMonth, ...nextMonth];
-
-    let next: { commitment: FinancialCommitment; dueDate: Date } | null = null;
-
-    for (const c of candidates) {
-      const m = candidates === thisMonth ? month : month === 12 ? 1 : month + 1;
-      const y = candidates === thisMonth ? year : month === 12 ? year + 1 : year;
-      const dueDate = getDueDateForMonth(c, m, y);
-      if (!dueDate) continue;
-      if (dueDate < now) continue;
-      if (!next || dueDate < next.dueDate) {
-        next = { commitment: c, dueDate };
-      }
-    }
-
-    // Simpler approach: just iterate candidates
-    let bestCandidate: { commitment: FinancialCommitment; dueDate: Date } | null = null;
+    let bestCandidate: MonthlyCommitmentItem | null = null;
     const searchMonths = [
       { m: month, y: year },
       { m: month === 12 ? 1 : month + 1, y: month === 12 ? year + 1 : year },
     ];
 
     for (const { m, y } of searchMonths) {
-      const monthCommitments = await PlanningService.getCommitmentsForMonth(ownerId, m, y);
-      for (const c of monthCommitments) {
-        const dueDate = getDueDateForMonth(c, m, y);
-        if (!dueDate || dueDate < now) continue;
-        if (!bestCandidate || dueDate < bestCandidate.dueDate) {
-          bestCandidate = { commitment: c, dueDate };
+      const monthInstallments = await PlanningService.getCommitmentsForMonth(ownerId, m, y);
+      for (const item of monthInstallments) {
+        if (item.dueDate < now) continue;
+        if (!bestCandidate || item.dueDate < bestCandidate.dueDate) {
+          bestCandidate = item;
         }
       }
       if (bestCandidate) break;
@@ -302,7 +412,7 @@ export class PlanningService {
     }
   ): Promise<MonthlySimulation> {
     const commitments = await PlanningService.getCommitmentsForMonth(ownerId, month, year);
-    const totalCommitted = commitments.reduce((sum, c) => sum + c.installmentAmount, 0);
+    const totalCommitted = commitments.reduce((sum, item) => sum + item.commitment.installmentAmount, 0);
     const totalIncome = params.incomeExpected + params.additionalIncome;
 
     const projectedBalance = calcProjectedBalance({

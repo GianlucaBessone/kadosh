@@ -8,9 +8,25 @@ import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { useLiveQuery } from 'dexie-react-hooks'
 import { db } from '@/lib/db'
 import { formatMoney } from '@/lib/utils'
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
+import { MotivationalVerseService } from '@/services/motivationalVerseService'
+import { useEffect, useState } from 'react'
 
 export default function SeedsPage() {
-  const seeds = useLiveQuery(() => db.seedGoals.orderBy('createdAt').reverse().toArray()) || [];
+  const seeds = useLiveQuery(() => 
+    db.seedGoals
+      .orderBy('createdAt')
+      .reverse()
+      .filter(seed => !seed.deletedAt)
+      .toArray()
+  ) || [];
+  const [verse, setVerse] = useState<{ text: string, reference: string } | null>(null);
+
+  useEffect(() => {
+    MotivationalVerseService.seedDefaultVerses().then(() => {
+      MotivationalVerseService.getRandomVerse('AHORRO').then(setVerse);
+    });
+  }, []);
 
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
@@ -20,12 +36,6 @@ export default function SeedsPage() {
           <h1 className="text-2xl font-semibold tracking-tight text-foreground">Tus Semillas</h1>
           <p className="text-sm text-muted-foreground mt-1">Lo que siembras hoy, cosecharás mañana.</p>
         </div>
-        <Link href="/seeds/new">
-          <Button size="icon" className="rounded-full shadow-md bg-secondary text-secondary-foreground hover:bg-secondary/80">
-            <Plus className="h-5 w-5" />
-            <span className="sr-only">Nueva semilla</span>
-          </Button>
-        </Link>
       </div>
 
       <div className="grid gap-4 mt-4">
@@ -36,10 +46,10 @@ export default function SeedsPage() {
             </p>
             <div className="max-w-sm space-y-4">
               <p className="text-[15px] italic text-foreground/90 leading-relaxed font-medium">
-                "Recuerden esto: El que siembra escasamente, escasamente cosechará, y el que siembra en abundancia, en abundancia cosechará."
+                "{verse?.text || 'Recuerden esto: El que siembra escasamente, escasamente cosechará, y el que siembra en abundancia, en abundancia cosechará.'}"
               </p>
               <p className="text-xs font-bold text-primary tracking-widest uppercase">
-                2 Corintios 9:6
+                {verse?.reference || '2 Corintios 9:6'}
               </p>
             </div>
           </div>
@@ -65,9 +75,9 @@ export default function SeedsPage() {
                     <div className="flex flex-col min-w-0">
                       <h3 className="font-semibold text-lg text-foreground truncate">{seed.name}</h3>
                       <div className="flex items-baseline gap-1 mt-1 flex-wrap">
-                        <span className={`font-bold whitespace-nowrap ${isReady ? 'text-gold' : 'text-foreground'}`}>{formatMoney(seed.currentAmount)}</span>
+                        <span className={`font-bold whitespace-nowrap flex items-center gap-1 ${isReady ? 'text-gold' : 'text-foreground'}`}><MoneyDisplay amount={seed.currentAmount} /></span>
                         {!isHarvested && (
-                          <span className="text-xs text-muted-foreground whitespace-nowrap">/ {formatMoney(seed.targetAmount)}</span>
+                          <span className="text-xs text-muted-foreground whitespace-nowrap flex items-center gap-1">/ <MoneyDisplay amount={seed.targetAmount} /></span>
                         )}
                         {isHarvested && (
                           <span className="text-xs text-muted-foreground">Cosechada</span>

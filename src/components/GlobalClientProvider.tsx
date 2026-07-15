@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { syncEngine } from '@/services/syncEngine';
 import { isAppUnlocked, hasLocalPin } from '@/features/auth/localAuth';
 import { useRouter, usePathname } from 'next/navigation';
@@ -10,6 +10,13 @@ import { db } from '@/lib/db';
 import { DailyVerseService } from '@/features/daily-verse/service';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+
+const PUBLIC_ROUTES = new Set(['/', '/login', '/registro', '/welcome']);
+
+function isPublicPath(pathname: string | null) {
+  if (!pathname) return false;
+  return PUBLIC_ROUTES.has(pathname);
+}
 
 /**
  * Reads the persisted theme from Dexie and applies the `dark` class to
@@ -33,6 +40,10 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
   const isMounted = useRef(false);
   const [isAuthVerified, setIsAuthVerified] = useState(false);
 
+  const markAuthVerified = useCallback(() => {
+    queueMicrotask(() => setIsAuthVerified(true));
+  }, []);
+
   useEffect(() => {
     isMounted.current = true;
 
@@ -50,34 +61,40 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
   useEffect(() => {
     if (!isMounted.current) return;
 
-    // PIN Authentication guard
-    const inAuthRoute = pathname === '/';
+    const publicRoute = isPublicPath(pathname);
 
-    if (!inAuthRoute) {
-      if (!hasLocalPin()) {
-        router.replace('/?setup=true');
-      } else if (!isAppUnlocked()) {
-        router.replace('/');
-      } else {
-        setIsAuthVerified(true);
-      }
-    } else {
-      // If we are in the auth route but already unlocked, redirect to home
-      if (hasLocalPin() && isAppUnlocked()) {
+    if (publicRoute) {
+      if ((pathname === '/login' || pathname === '/registro') && hasLocalPin() && isAppUnlocked()) {
         router.replace('/home');
-      } else {
-        setIsAuthVerified(true);
+        return;
       }
-    }
-  }, [pathname, router]);
 
-  // Don't render children until we've verified auth on the client to prevent flickering
+      markAuthVerified();
+      return;
+    }
+
+    if (!hasLocalPin()) {
+      router.replace('/login?setup=true');
+      return;
+    }
+
+    if (!isAppUnlocked()) {
+      router.replace('/login');
+      return;
+    }
+
+    markAuthVerified();
+  }, [markAuthVerified, pathname, router]);
+
+  // Don't render children until we've verified auth on the client to prevent flickering.
   if (typeof window === 'undefined' || !isAuthVerified) return null;
+
+  const publicRoute = isPublicPath(pathname);
 
   return (
     <TooltipProvider>
       <ThemeApplier />
-      <OnboardingModal />
+      {pathname !== '/welcome' && <OnboardingModal />}
       {children}
     </TooltipProvider>
   );

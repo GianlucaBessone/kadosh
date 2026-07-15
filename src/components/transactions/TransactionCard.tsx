@@ -1,5 +1,6 @@
 import { Transaction } from '@/lib/db';
 import { formatMoney } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { 
   Sprout, Droplet, HandHeart, Wallet, Banknote,
   ShoppingCart, Home, Car, Utensils, Pill, BookOpen, Film, Lightbulb, Shirt, Package,
@@ -84,8 +85,8 @@ export function TransactionCard({ tx }: { tx: Transaction }) {
           <p className="text-xs text-muted-foreground">{new Date(tx.date).toLocaleDateString()}</p>
         </div>
       </div>
-      <span className={`font-semibold text-sm shrink-0 whitespace-nowrap z-10 relative ${textColor}`}>
-        {tx.type === 'INCOME' ? '+' : '-'} {formatMoney(tx.amount)}
+      <span className={`font-semibold text-sm shrink-0 whitespace-nowrap z-10 relative flex items-center ${textColor}`}>
+        {tx.type === 'INCOME' ? '+' : '-'} <MoneyDisplay amount={tx.amount} className="ml-1" />
       </span>
     </div>
   );

@@ -40,11 +40,19 @@ export function BottomNav() {
     isMore?: boolean;
   };
 
+  let centerAction = { name: 'Registrar', href: '/register-tx', icon: Plus, isCenter: true };
+  
+  if (currentPath.startsWith('/planning')) {
+    centerAction = { name: 'Nuevo', href: '/planning/new', icon: Plus, isCenter: true };
+  } else if (currentPath.startsWith('/seeds')) {
+    centerAction = { name: 'Nueva', href: '/seeds/new', icon: Plus, isCenter: true };
+  }
+
   const navItems: NavItem[] = [
     { name: 'Inicio', href: '/home', icon: Home },
     { name: 'Semillas', href: '/seeds', icon: Sprout },
     // Center button (handled separately for styling)
-    { name: 'Registrar', href: '/register-tx', icon: Plus, isCenter: true },
+    centerAction,
     { name: 'Diezmo', href: '/tithe', icon: HandHeart },
     // "Más" handled separately (opens MoreSheet instead of navigating)
     { name: 'Más', icon: GridPlusIcon, isMore: true },

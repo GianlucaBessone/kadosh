@@ -124,7 +124,7 @@ export class SeedService {
         id: transactionId,
         userId: goal.userId,
         accountId: account.id,
-        categoryId: null,
+        categoryId: 'seed_transfer',
         amount,
         type: 'EXPENSE',
         date: now,
@@ -181,7 +181,7 @@ export class SeedService {
         id: transactionId,
         userId: goal.userId,
         accountId: account.id,
-        categoryId: null,
+        categoryId: 'seed_transfer',
         amount,
         type: 'INCOME',
         date: now,
@@ -196,6 +196,54 @@ export class SeedService {
       const newBalance = account.balance + amount;
       await db.accounts.update(account.id, { balance: newBalance, updatedAt: now });
       await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: now });
+    });
+  }
+
+  static async deleteSeed(seedGoalId: string, restoreBalance: boolean) {
+    const now = new Date().toISOString();
+    
+    await db.transaction('rw', db.seedGoals, db.seedContributions, db.accounts, db.transactions, db.syncQueue, async () => {
+      const goal = await db.seedGoals.get(seedGoalId);
+      if (!goal || goal.deletedAt) return;
+
+      // Soft delete the goal
+      await db.seedGoals.update(goal.id, { deletedAt: now, updatedAt: now });
+      await addToSyncQueue('SeedGoal', goal.id, 'UPDATE', { deletedAt: now, updatedAt: now });
+
+      // Soft delete all contributions
+      const contributions = await db.seedContributions.where('seedGoalId').equals(seedGoalId).toArray();
+      for (const contrib of contributions) {
+        if (!contrib.deletedAt) {
+          await db.seedContributions.update(contrib.id, { deletedAt: now, updatedAt: now });
+          await addToSyncQueue('SeedContribution', contrib.id, 'UPDATE', { deletedAt: now, updatedAt: now });
+        }
+      }
+
+      if (restoreBalance && goal.currentAmount > 0) {
+        const account = await db.accounts.orderBy('id').first();
+        if (account) {
+          const transactionId = uuidv4();
+          const transaction = {
+            id: transactionId,
+            userId: goal.userId,
+            accountId: account.id,
+            categoryId: null, // or some specific category if needed
+            amount: goal.currentAmount,
+            type: 'INCOME',
+            date: now,
+            notes: `Devolución por semilla eliminada: ${goal.name}`,
+            createdAt: now,
+            updatedAt: now,
+            deletedAt: null,
+          };
+          await db.transactions.add(transaction);
+          await addToSyncQueue('Transaction', transactionId, 'INSERT', transaction);
+
+          const newBalance = account.balance + goal.currentAmount;
+          await db.accounts.update(account.id, { balance: newBalance, updatedAt: now });
+          await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: now });
+        }
+      }
     });
   }
 }

@@ -22,6 +22,14 @@ export const PlanningRepository = {
       .toArray();
   },
 
+  async getPausedCommitments(ownerId: string): Promise<FinancialCommitment[]> {
+    return db.financialCommitments
+      .where('ownerId')
+      .equals(ownerId)
+      .filter(c => c.deletedAt === null && c.status === 'PAUSED')
+      .toArray();
+  },
+
   async getCommitmentById(id: string): Promise<FinancialCommitment | undefined> {
     return db.financialCommitments.get(id);
   },

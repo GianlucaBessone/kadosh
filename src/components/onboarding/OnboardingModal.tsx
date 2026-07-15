@@ -14,6 +14,7 @@ import {
   MapPin,
   Sparkles,
   ArrowRight,
+  CalendarDays,
 } from 'lucide-react';
 
 // ─────────────────────────────────────────────
@@ -97,7 +98,18 @@ const SLIDES: OnboardingSlide[] = [
     gradient: 'from-[#8FBF9F]/20 to-[#8FBF9F]/5',
     accentColor: 'text-[#8FBF9F]',
   },
-  // ── 5 · Reportes (placeholder) ──────────────
+  // ── 5 · Planificación ───────────────────────
+  {
+    id: 'planning',
+    icon: <CalendarDays className="h-10 w-10" />,
+    badge: 'Planificación',
+    title: 'Compromisos y Deudas',
+    subtitle: 'Tus obligaciones bajo control',
+    body: 'Registrá tus pagos recurrentes, cuotas y servicios. KADOSH te muestra exactamente cuánto debes separar antes de gastar y te ayuda a simular tu balance mensual para evitar sorpresas.',
+    gradient: 'from-[#85A6B8]/20 to-[#85A6B8]/5',
+    accentColor: 'text-[#85A6B8]',
+  },
+  // ── 6 · Reportes (placeholder) ──────────────
   {
     id: 'reports',
     icon: <BarChart3 className="h-10 w-10" />,
@@ -135,7 +147,7 @@ function markOnboardingDone() {
   }
 }
 
-function hasSeenOnboarding(): boolean {
+export function hasSeenOnboarding(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) === '1';
   } catch {
@@ -220,6 +232,10 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
     const delta = dragStartX - e.clientX;
     if (Math.abs(delta) > 50) {
       if (delta > 0 && !isLast) goNext();
+      else if (delta < 0 && !isFirst) {
+        setDirection(-1);
+        setIndex((i) => i - 1);
+      }
     }
     setDragStartX(null);
   };
@@ -278,7 +294,7 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
 
       {/* ── Slide content (animated) ─────────── */}
       <div className="relative flex-1 overflow-hidden">
-        <AnimatePresence custom={direction} mode="popLayout">
+        <AnimatePresence custom={direction} mode="wait">
           <motion.div
             key={slide.id}
             custom={direction}

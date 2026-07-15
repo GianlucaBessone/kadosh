@@ -1,5 +1,6 @@
 import React from 'react'
 import { BottomNav } from '@/components/shared/BottomNav'
+import { PulseManager } from '@/components/shared/PulseManager'
 
 export default function MainLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -15,6 +16,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <div className="w-full max-w-md mx-auto">
         <BottomNav />
       </div>
+      <PulseManager />
     </div>
   )
 }

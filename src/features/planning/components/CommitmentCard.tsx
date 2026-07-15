@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import Link from 'next/link';
 import {
   MoreHorizontal,
   CheckCircle2,
@@ -22,7 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { formatMoney } from '@/lib/utils';
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { formatShortDate } from '../utils/dateUtils';
 import { COMMITMENT_TYPE_LABELS } from '../types';
 import type { FinancialCommitment } from '@/lib/db';
@@ -40,6 +41,8 @@ interface CommitmentCardProps {
   onPaymentDone?: () => void;
   onUpdateAlarm?: (hasReminder: boolean, time: string, days: number) => Promise<void>;
 }
+
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 const TYPE_ICONS: Record<CommitmentType, LucideIcon> = {
   [CommitmentType.SUBSCRIPTION]: Tv,
@@ -70,16 +73,32 @@ export function CommitmentCard({
   const [tempHasReminder, setTempHasReminder] = useState(commitment.hasReminder);
   const [tempReminderTime, setTempReminderTime] = useState(commitment.reminderTime || '08:00');
   const [tempReminderDays, setTempReminderDays] = useState(commitment.reminderDaysBefore);
+  const [showLatePayments, setShowLatePayments] = useState(false);
 
-  const isCompleted = commitment.status === CommitmentStatus.COMPLETED;
+  const isCompleted = commitment.status === CommitmentStatus.COMPLETED || commitment.status === CommitmentStatus.CANCELLED;
   const isPaused = commitment.status === CommitmentStatus.PAUSED;
   const isRecurring = commitment.isRecurring;
   const hasInstallments = !isRecurring && commitment.installments !== null;
   const IconComponent = TYPE_ICONS[commitment.type] ?? Pin;
-  const typeLabel = COMMITMENT_TYPE_LABELS[commitment.type];
+  const typeLabel = commitment.type === CommitmentType.CUSTOM && commitment.customTypeName 
+    ? commitment.customTypeName 
+    : COMMITMENT_TYPE_LABELS[commitment.type];
 
   const payments = useCommitmentPayments(commitment.id);
   const isPaid = payments.some(p => p.installmentNumber === installmentNumber);
+
+  const pastUnpaidInstallments = useMemo(() => {
+    const unpaid = [];
+    for (let i = 1; i < installmentNumber; i++) {
+      if (!payments.some(p => p.installmentNumber === i)) {
+        unpaid.push(i);
+      }
+    }
+    return unpaid;
+  }, [installmentNumber, payments]);
+
+  const totalAtrasado = pastUnpaidInstallments.length * commitment.installmentAmount;
+  const totalAPagar = totalAtrasado + (isPaid ? 0 : commitment.installmentAmount);
 
   // eslint-disable-next-line react-hooks/purity
   const daysUntil = Math.ceil((dueDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
@@ -132,9 +151,11 @@ export function CommitmentCard({
                 <IconComponent className="w-6 h-6" strokeWidth={1.5} />
               </div>
               <div className="min-w-0">
-                <h3 className="font-semibold text-foreground text-base leading-tight truncate">
-                  {commitment.name}
-                </h3>
+                <Link href={`/planning/${commitment.id}`} className="hover:underline">
+                  <h3 className="font-semibold text-foreground text-base leading-tight truncate">
+                    {commitment.name}
+                  </h3>
+                </Link>
                 <p className="text-xs text-muted-foreground mt-0.5">{typeLabel}</p>
               </div>
             </div>
@@ -182,15 +203,53 @@ export function CommitmentCard({
             </div>
           )}
 
+          {/* Late Payments */}
+          {pastUnpaidInstallments.length > 0 && !isCompleted && (
+            <div className="mt-4 rounded-2xl bg-destructive/5 border border-destructive/10 overflow-hidden">
+              <button 
+                onClick={() => setShowLatePayments(v => !v)}
+                className="w-full flex items-center justify-between p-3 text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <span className="text-xs font-semibold uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="w-1.5 h-1.5 rounded-full bg-destructive animate-pulse" />
+                  Pagos atrasados ({pastUnpaidInstallments.length})
+                </span>
+                {showLatePayments ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+              </button>
+              
+              {showLatePayments && (
+                <div className="p-3 pt-0 text-sm text-foreground animate-in slide-in-from-top-2">
+                  <div className="flex flex-col gap-2 pt-2 border-t border-destructive/10">
+                    {pastUnpaidInstallments.map(cuotaNum => (
+                      <div key={cuotaNum} className="flex justify-between items-center text-xs">
+                        <span className="text-muted-foreground">Cuota {cuotaNum}</span>
+                        <span className="font-semibold text-destructive/80">
+                          <MoneyDisplay amount={commitment.installmentAmount} />
+                        </span>
+                      </div>
+                    ))}
+                    <div className="flex justify-between items-center mt-2 pt-2 border-t border-destructive/10 font-bold text-destructive">
+                      <span>Total Atrasado</span>
+                      <MoneyDisplay amount={totalAtrasado} />
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Amount row */}
-          <div className="mt-3 flex items-end justify-between">
+          <div className="mt-4 flex items-end justify-between">
             <div className="flex flex-col">
-              <span className="text-2xl font-bold text-foreground tracking-tight">
-                {formatMoney(commitment.installmentAmount)}
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-0.5">
+                {pastUnpaidInstallments.length > 0 ? 'Total a Pagar' : 'Cuota Actual'}
+              </span>
+              <span className="text-2xl font-bold text-foreground tracking-tight flex items-center">
+                <MoneyDisplay amount={pastUnpaidInstallments.length > 0 ? totalAPagar : commitment.installmentAmount} />
               </span>
               {hasInstallments && commitment.remainingAmount !== null && (
-                <span className="text-xs text-muted-foreground mt-0.5">
-                  Restan {formatMoney(commitment.remainingAmount)}
+                <span className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
+                  Restan <MoneyDisplay amount={commitment.remainingAmount} />
                 </span>
               )}
             </div>
@@ -264,9 +323,16 @@ export function CommitmentCard({
                   onClick={() => { setShowOptions(false); onViewHistory(); }}
                   className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
                 >
-                  Ver historial
+                  Ver pagos
                 </button>
               )}
+
+              <Link
+                href={`/planning/${commitment.id}`}
+                className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
+              >
+                Ver detalles
+              </Link>
             </div>
           )}
         </div>

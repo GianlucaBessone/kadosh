@@ -14,11 +14,20 @@ export {
 
 // ─── Derived / view-only types ──────────────────────────────────────────────
 
+export type PlanningPeriod = 'MONTH' | 'Q1' | 'Q2';
+
+
+export interface MonthlyCommitmentItem {
+  commitment: import('@/lib/db').FinancialCommitment;
+  dueDate: Date;
+  installmentIndex: number;
+}
+
 /** Result of simulating a month's financial balance */
 export interface MonthlySimulation {
   month: number; // 1-12
   year: number;
-  commitments: import('@/lib/db').FinancialCommitment[];
+  commitments: MonthlyCommitmentItem[];
   totalCommitted: number;
   incomeExpected: number;
   additionalIncome: number;
@@ -53,6 +62,7 @@ export const PERIODICITY_LABELS: Record<import('@/lib/db').CommitmentPeriodicity
   QUARTERLY: 'Trimestral',
   SEMIANNUAL: 'Semestral',
   YEARLY: 'Anual',
+  BIWEEKLY: 'Quincenal',
   CUSTOM: 'Personalizado',
 };
 

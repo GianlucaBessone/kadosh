@@ -18,6 +18,8 @@ export interface CommitmentFormData {
   reminderDaysBefore: number;
   reminderTime?: string;
   notes: string | null;
+  customPeriodicityDays?: number | null;
+  customTypeName?: string | null;
 }
 
 export interface ValidationResult {
@@ -38,6 +40,14 @@ export function validateCommitmentForm(data: CommitmentFormData): ValidationResu
 
   if (!data.periodicity) {
     errors.periodicity = 'Seleccioná la periodicidad.';
+  } else if (data.periodicity === CommitmentPeriodicity.CUSTOM) {
+    if (!data.customPeriodicityDays || data.customPeriodicityDays < 1) {
+      errors.customPeriodicityDays = 'Ingresá una cantidad de días válida.';
+    }
+  }
+
+  if (data.type === CommitmentType.CUSTOM && (!data.customTypeName || data.customTypeName.trim().length < 2)) {
+    errors.customTypeName = 'Ingresá un nombre para el tipo personalizado.';
   }
 
   if (!data.firstDueDate) {

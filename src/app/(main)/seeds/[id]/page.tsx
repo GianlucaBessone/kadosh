@@ -1,7 +1,8 @@
 'use client';
 
-import { ArrowLeft, Droplet, Sprout, Check, History } from 'lucide-react'
+import { ArrowLeft, Droplet, Sprout, Check, History, Trash2 } from 'lucide-react'
 import Link from 'next/link'
+import { useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { Button } from '@/components/ui/button'
@@ -13,11 +14,15 @@ import { db } from '@/lib/db'
 import { SeedService } from '@/services/seedService'
 import { formatMoney, cn } from '@/lib/utils'
 import { MoneyInput } from '@/components/ui/MoneyInput'
+import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
 
 export default function SeedDetailPage() {
   const params = useParams<{ id: string }>();
   const id = params?.id || '';
   const router = useRouter();
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const seed = useLiveQuery(() => db.seedGoals.get(id));
 
@@ -76,6 +81,18 @@ export default function SeedDetailPage() {
     await SeedService.harvestSeed(seed.id);
   }
 
+  const handleDelete = async (restoreBalance: boolean) => {
+    if (deleting) return;
+    setDeleting(true);
+    try {
+      await SeedService.deleteSeed(seed.id, restoreBalance);
+      router.replace('/seeds');
+    } catch (e) {
+      console.error(e);
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-6 w-full animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       
@@ -87,6 +104,13 @@ export default function SeedDetailPage() {
           </Link>
           <h1 className="text-xl font-semibold tracking-tight text-foreground truncate">{seed.name}</h1>
         </div>
+        <button 
+          onClick={() => setShowDeleteModal(true)}
+          className="p-2 text-muted-foreground hover:text-destructive transition-colors rounded-full hover:bg-destructive/10"
+          aria-label="Eliminar semilla"
+        >
+          <Trash2 className="w-5 h-5" />
+        </button>
       </div>
 
       <div className="flex justify-center mt-4 mb-2 relative">
@@ -99,10 +123,10 @@ export default function SeedDetailPage() {
         <span className="text-sm font-medium text-muted-foreground uppercase tracking-wider">Crecimiento</span>
         <div className="flex items-baseline gap-2">
           <div className="flex flex-col items-center">
-            <span className={`text-4xl font-bold tracking-tighter ${isReady ? 'text-gold' : 'text-foreground'}`}>
-              {formatMoney(seed.currentAmount)}
+            <span className={`text-4xl font-bold tracking-tighter flex items-center ${isReady ? 'text-gold' : 'text-foreground'}`}>
+              <MoneyDisplay amount={seed.currentAmount} />
             </span>
-            <span className="text-sm text-muted-foreground">de {formatMoney(seed.targetAmount)}</span>
+            <span className="text-sm text-muted-foreground flex items-center gap-1">de <MoneyDisplay amount={seed.targetAmount} /></span>
           </div>
         </div>
       </div>
@@ -219,13 +243,61 @@ export default function SeedDetailPage() {
                   {new Date(item.date).toLocaleDateString()}
                 </p>
               </div>
-              <span className={`font-semibold ${item.amount > 0 ? 'text-primary' : 'text-foreground'}`}>
-                {item.amount > 0 ? '+ ' : ''}{formatMoney(item.amount)}
+              <span className={`font-semibold flex items-center ${item.amount > 0 ? 'text-primary' : 'text-foreground'}`}>
+                {item.amount > 0 ? '+ ' : ''}<MoneyDisplay amount={item.amount} className="ml-1" />
               </span>
             </div>
           ))}
         </div>
       </div>
+
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-card border border-border shadow-lg rounded-3xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 text-center">
+              <div className="mx-auto w-12 h-12 bg-destructive/10 text-destructive rounded-full flex items-center justify-center mb-4">
+                <Trash2 className="w-5 h-5" />
+              </div>
+              <h3 className="text-xl font-semibold mb-2">Eliminar semilla</h3>
+              <p className="text-sm text-muted-foreground mb-6">
+                Elige qué hacer con los fondos aportados a esta semilla.
+              </p>
+              
+              <div className="flex flex-col gap-3 text-left">
+                <button
+                  onClick={() => handleDelete(true)}
+                  disabled={deleting}
+                  className="w-full p-3 rounded-2xl border border-primary/20 bg-primary/5 hover:bg-primary/10 transition-colors"
+                >
+                  <p className="font-semibold text-sm text-primary">Restaurar saldo al balance principal</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Se creará un movimiento de ingreso por <span className="font-semibold text-foreground"><MoneyDisplay amount={seed.currentAmount} /></span> y se eliminará la semilla.
+                  </p>
+                </button>
+
+                <button
+                  onClick={() => handleDelete(false)}
+                  disabled={deleting}
+                  className="w-full p-3 rounded-2xl border border-destructive/20 bg-destructive/5 hover:bg-destructive/10 transition-colors"
+                >
+                  <p className="font-semibold text-sm text-destructive">Eliminar sin restaurar saldo</p>
+                  <p className="text-xs text-muted-foreground mt-1">El dinero se perderá del balance. ¡Acción irreversible!</p>
+                </button>
+              </div>
+
+              <div className="mt-6">
+                <button
+                  onClick={() => setShowDeleteModal(false)}
+                  disabled={deleting}
+                  className="w-full h-12 rounded-full border border-border text-foreground font-semibold text-sm hover:bg-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )
