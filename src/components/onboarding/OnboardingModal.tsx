@@ -135,7 +135,7 @@ function markOnboardingDone() {
   }
 }
 
-function hasSeenOnboarding(): boolean {
+export function hasSeenOnboarding(): boolean {
   try {
     return localStorage.getItem(STORAGE_KEY) === '1';
   } catch {

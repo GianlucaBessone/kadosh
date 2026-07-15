@@ -34,10 +34,10 @@ export function PlanningModeModal({ settings, onComplete }: PlanningModeModalPro
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm p-4">
-      <div className="w-full max-w-md bg-background border border-border shadow-xl rounded-3xl overflow-hidden animate-in fade-in zoom-in-95 duration-300">
-        <div className="p-6 pb-2 text-center">
-          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+    <div className="fixed inset-0 z-[100] flex flex-col bg-background p-6 overflow-y-auto">
+      <div className="w-full max-w-md mx-auto my-auto flex flex-col gap-6 animate-in fade-in zoom-in-95 duration-300">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <CalendarDays className="w-8 h-8 text-primary" />
           </div>
           <h2 className="text-2xl font-bold text-foreground">
@@ -48,7 +48,7 @@ export function PlanningModeModal({ settings, onComplete }: PlanningModeModalPro
           </p>
         </div>
 
-        <div className="p-6 flex flex-col gap-3">
+        <div className="flex flex-col gap-4">
           <Card 
             className={cn(
               "cursor-pointer transition-all duration-300 border-2",
@@ -92,9 +92,9 @@ export function PlanningModeModal({ settings, onComplete }: PlanningModeModalPro
           <button
             onClick={handleSave}
             disabled={!selected || loading}
-            className="w-full mt-4 bg-primary text-primary-foreground font-semibold py-3.5 rounded-2xl disabled:opacity-50 transition-colors"
+            className="w-full mt-6 bg-primary text-primary-foreground font-semibold py-4 rounded-2xl disabled:opacity-50 transition-colors text-lg"
           >
-            {loading ? 'Guardando...' : 'Guardar'}
+            {loading ? 'Guardando...' : 'Comenzar'}
           </button>
         </div>
       </div>
