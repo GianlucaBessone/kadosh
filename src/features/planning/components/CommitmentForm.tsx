@@ -7,6 +7,7 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { CommitmentType, CommitmentPeriodicity } from '@/lib/db';
 import type { FinancialCommitment } from '@/lib/db';
 import { COMMITMENT_TYPE_LABELS, PERIODICITY_LABELS } from '../types';
+import type { PlanningPeriod } from '../types';
 import { validateCommitmentForm } from '../validators/commitmentValidator';
 import type { CommitmentFormData } from '../validators/commitmentValidator';
 import { calcInstallmentAmount, calcTotalAmount } from '../utils/amountUtils';
@@ -65,6 +66,9 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
   const [type, setType] = useState<CommitmentType>(initial?.type ?? CommitmentType.INSTALLMENT);
   const [periodicity, setPeriodicity] = useState<CommitmentPeriodicity>(
     initial?.periodicity ?? CommitmentPeriodicity.MONTHLY
+  );
+  const [biweeklyPeriod, setBiweeklyPeriod] = useState<'Q1' | 'Q2'>(
+    initial?.biweeklyPeriod ?? 'Q1'
   );
   const [firstDueDate, setFirstDueDate] = useState(
     initial?.firstDueDate ? initial.firstDueDate.split('T')[0] : getLocalYYYYMMDD(new Date())
@@ -146,6 +150,7 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
         installments: formData.installments,
         remainingAmount: formData.amountTotal,
         periodicity: formData.periodicity,
+        biweeklyPeriod: formData.periodicity === CommitmentPeriodicity.BIWEEKLY ? biweeklyPeriod : undefined,
         firstDueDate: new Date(formData.firstDueDate).toISOString(),
         dayOfMonth: formData.dayOfMonth,
         hasReminder: formData.hasReminder,
@@ -250,15 +255,46 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
 
       {/* Periodicidad */}
       <Field label="Periodicidad" error={errors.periodicity}>
-        <select
-          value={periodicity}
-          onChange={e => setPeriodicity(e.target.value as CommitmentPeriodicity)}
-          className={selectClass}
-        >
-          {Object.entries(PERIODICITY_LABELS).map(([key, label]) => (
-            <option key={key} value={key}>{label}</option>
-          ))}
-        </select>
+        <div className="flex flex-col gap-3">
+          <select
+            value={periodicity}
+            onChange={e => setPeriodicity(e.target.value as CommitmentPeriodicity)}
+            className={selectClass}
+          >
+            {Object.entries(PERIODICITY_LABELS).map(([key, label]) => (
+              <option key={key} value={key}>{label}</option>
+            ))}
+          </select>
+
+          {periodicity === CommitmentPeriodicity.BIWEEKLY && (
+            <div className="grid grid-cols-2 gap-2 mt-1">
+              <button
+                type="button"
+                onClick={() => setBiweeklyPeriod('Q1')}
+                className={cn(
+                  'h-10 rounded-xl text-xs font-semibold border transition-all duration-150',
+                  biweeklyPeriod === 'Q1'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted text-muted-foreground border-transparent hover:text-foreground'
+                )}
+              >
+                1.ª Quincena
+              </button>
+              <button
+                type="button"
+                onClick={() => setBiweeklyPeriod('Q2')}
+                className={cn(
+                  'h-10 rounded-xl text-xs font-semibold border transition-all duration-150',
+                  biweeklyPeriod === 'Q2'
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted text-muted-foreground border-transparent hover:text-foreground'
+                )}
+              >
+                2.ª Quincena
+              </button>
+            </div>
+          )}
+        </div>
       </Field>
 
       {/* Primer vencimiento */}

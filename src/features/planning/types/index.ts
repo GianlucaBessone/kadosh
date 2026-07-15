@@ -14,6 +14,9 @@ export {
 
 // ─── Derived / view-only types ──────────────────────────────────────────────
 
+export type PlanningPeriod = 'MONTH' | 'Q1' | 'Q2';
+
+
 /** Result of simulating a month's financial balance */
 export interface MonthlySimulation {
   month: number; // 1-12
@@ -53,6 +56,7 @@ export const PERIODICITY_LABELS: Record<import('@/lib/db').CommitmentPeriodicity
   QUARTERLY: 'Trimestral',
   SEMIANNUAL: 'Semestral',
   YEARLY: 'Anual',
+  BIWEEKLY: 'Quincenal',
   CUSTOM: 'Personalizado',
 };
 

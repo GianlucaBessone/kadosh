@@ -76,7 +76,7 @@ export default function TithePage() {
     db.transactions.where('date').aboveOrEqual(currentMonthStart.toISOString()).toArray()
   ) || [];
 
-  const incomes = currentMonthTx.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
+  const incomes = currentMonthTx.filter(t => t.type === 'INCOME' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
   const actualPercentage = customPercentage ?? 10;
   const suggestedTithe = customFixedAmount !== null 
     ? customFixedAmount 
@@ -123,7 +123,7 @@ export default function TithePage() {
       });
 
       // Deduct from account balance
-      const account = await db.accounts.where('userId').equals(user.id).first();
+      const account = await db.accounts.orderBy('id').first();
       if (account) {
         const { AccountService } = await import('@/services/accountService');
         await AccountService.updateAccount(account.id, {

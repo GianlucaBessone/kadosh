@@ -1,5 +1,6 @@
 import { CommitmentPeriodicity } from '@/lib/db';
 import type { FinancialCommitment } from '@/lib/db';
+import type { PlanningPeriod } from '@/features/planning/types';
 
 /**
  * Given a commitment and a target month/year, returns the due date for that period.
@@ -68,6 +69,35 @@ export function commitmentAppliesToMonth(
   return isInPeriodicityCycle(elapsed, commitment.periodicity);
 }
 
+/**
+ * Checks whether a given commitment applies to a specific period (MONTH, Q1, Q2).
+ */
+export function commitmentAppliesToPeriod(
+  commitment: FinancialCommitment,
+  month: number,
+  year: number,
+  period: PlanningPeriod
+): boolean {
+  if (!commitmentAppliesToMonth(commitment, month, year)) return false;
+  if (period === 'MONTH') return true;
+
+  // Si es estrictamente quincenal y tiene Q1/Q2 asignado
+  if (commitment.periodicity === CommitmentPeriodicity.BIWEEKLY && commitment.biweeklyPeriod) {
+    return commitment.biweeklyPeriod === period;
+  }
+
+  // Para compromisos regulares, verificar si el día de pago cae en la quincena
+  const dueDate = getDueDateForMonth(commitment, month, year);
+  if (!dueDate) return false;
+  const day = dueDate.getDate();
+  
+  if (period === 'Q1') {
+    return day >= 1 && day <= 15;
+  } else {
+    return day >= 16;
+  }
+}
+
 /** How many months elapsed from (fromYear, fromMonth) to (toYear, toMonth) */
 export function monthsBetween(
   fromYear: number, fromMonth: number,
@@ -88,6 +118,7 @@ export function periodicityToMonths(periodicity: CommitmentPeriodicity): number 
     case CommitmentPeriodicity.DAILY:
     case CommitmentPeriodicity.WEEKLY:
     case CommitmentPeriodicity.MONTHLY:
+    case CommitmentPeriodicity.BIWEEKLY:
       return 1;
     case CommitmentPeriodicity.BIMONTHLY:
       return 2;

@@ -12,10 +12,14 @@ import {
 } from '../utils/amountUtils';
 import type { FinancialCommitment } from '@/lib/db';
 import Link from 'next/link';
+import { PeriodSelector } from '@/components/shared/PeriodSelector';
+import type { PlanningPeriod } from '../types';
+import { commitmentAppliesToPeriod } from '../utils/dateUtils';
 
 interface SimulatorModalProps {
   month: number;
   year: number;
+  initialPeriod: PlanningPeriod;
   commitments: FinancialCommitment[];
   onClose: () => void;
 }
@@ -52,8 +56,9 @@ function InputField({
   );
 }
 
-export function SimulatorModal({ month, year, commitments, onClose }: SimulatorModalProps) {
+export function SimulatorModal({ month, year, initialPeriod, commitments, onClose }: SimulatorModalProps) {
   const [isClosing, setIsClosing] = useState(false);
+  const [selectedPeriod, setSelectedPeriod] = useState<PlanningPeriod>(initialPeriod);
 
   const handleClose = () => {
     setIsClosing(true);
@@ -64,7 +69,8 @@ export function SimulatorModal({ month, year, commitments, onClose }: SimulatorM
   const [extraExpenses, setExtraExpenses] = useState<number | null>(null);
   const [desiredSavings, setDesiredSavings] = useState<number | null>(null);
 
-  const totalCommitted = commitments.reduce((s, c) => s + c.installmentAmount, 0);
+  const filteredCommitments = commitments.filter(c => commitmentAppliesToPeriod(c, month, year, selectedPeriod));
+  const totalCommitted = filteredCommitments.reduce((s, c) => s + c.installmentAmount, 0);
   const incomeNum = (income || 0);
   const additionalNum = (additionalIncome || 0);
   const extraNum = (extraExpenses || 0);
@@ -129,7 +135,9 @@ export function SimulatorModal({ month, year, commitments, onClose }: SimulatorM
         </div>
 
         {/* Scrollable content */}
-        <div className="flex-1 overflow-y-auto overscroll-y-contain px-5 pt-5 pb-28 flex flex-col gap-5">
+        <div className="flex-1 overflow-y-auto overscroll-y-contain px-5 pt-3 pb-28 flex flex-col gap-5">
+          <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} className="mb-2" />
+          
           {/* Inputs */}
           <div className="flex flex-col gap-4">
             <InputField label="Ingreso esperado" value={income} onChange={setIncome} />

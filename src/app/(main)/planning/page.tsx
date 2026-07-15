@@ -16,6 +16,8 @@ import { useCommitmentPayments } from '@/features/planning/hooks/usePlanningData
 import { getInstallmentNumberForMonth } from '@/features/planning/utils/dateUtils';
 import type { FinancialCommitment } from '@/lib/db';
 import { useRouter } from 'next/navigation';
+import { PeriodSelector } from '@/components/shared/PeriodSelector';
+import type { PlanningPeriod } from '@/features/planning/types';
 
 function PaymentHistoryWrapper({
   commitment,
@@ -40,6 +42,7 @@ export default function PlanningPage() {
   const today = new Date();
   const [selectedMonth, setSelectedMonth] = useState(today.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState(today.getFullYear());
+  const [selectedPeriod, setSelectedPeriod] = useState<PlanningPeriod>('MONTH');
   const [showSimulator, setShowSimulator] = useState(false);
   const [historyCommitment, setHistoryCommitment] = useState<FinancialCommitment | null>(null);
   const router = useRouter();
@@ -48,8 +51,9 @@ export default function PlanningPage() {
   const ownerId = user?.id ?? '';
 
   const allCommitments = useAllCommitments(ownerId);
-  const monthlyEntries = useMonthlyCommitments(allCommitments, selectedMonth, selectedYear);
-  const summary = useMonthlySummary(allCommitments, selectedMonth, selectedYear);
+  const fullMonthEntries = useMonthlyCommitments(allCommitments, selectedMonth, selectedYear, 'MONTH');
+  const monthlyEntries = useMonthlyCommitments(allCommitments, selectedMonth, selectedYear, selectedPeriod);
+  const summary = useMonthlySummary(allCommitments, selectedMonth, selectedYear, selectedPeriod);
 
   const isEmpty = allCommitments.filter(c => c.status === 'ACTIVE').length === 0;
 
@@ -123,18 +127,22 @@ export default function PlanningPage() {
         </button>
       </div>
 
-      {/* Month selector */}
       <MonthSelector
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
         onChange={(m, y) => { setSelectedMonth(m); setSelectedYear(y); }}
       />
+      <div className="-mt-3">
+        <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
+      </div>
 
       {/* Summary card */}
       <MonthlySummaryCard
         month={selectedMonth}
         year={selectedYear}
         totalCommitted={summary.totalCommitted}
+        totalQ1={summary.totalQ1}
+        totalQ2={summary.totalQ2}
         count={summary.count}
         nextDueDate={summary.nextDueDate}
       />
@@ -206,7 +214,8 @@ export default function PlanningPage() {
         <SimulatorModal
           month={selectedMonth}
           year={selectedYear}
-          commitments={monthlyEntries.map(e => e.commitment)}
+          initialPeriod={selectedPeriod}
+          commitments={fullMonthEntries.map(e => e.commitment)}
           onClose={() => setShowSimulator(false)}
         />
       )}

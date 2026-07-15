@@ -22,6 +22,7 @@ export enum CommitmentPeriodicity {
   QUARTERLY = 'QUARTERLY',
   SEMIANNUAL = 'SEMIANNUAL',
   YEARLY = 'YEARLY',
+  BIWEEKLY = 'BIWEEKLY',
   CUSTOM = 'CUSTOM',
 }
 
@@ -52,6 +53,8 @@ export interface Settings {
   dailyVerse: boolean;
   showReflection: boolean;
   offlineDownload: boolean;
+  planningMode?: 'MONTHLY' | 'BIWEEKLY';
+  hasSelectedPlanningMode?: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -182,6 +185,7 @@ export interface FinancialCommitment {
   /** Monto restante. null si es recurrente */
   remainingAmount: number | null;
   periodicity: CommitmentPeriodicity;
+  biweeklyPeriod?: 'Q1' | 'Q2';
   /** Fecha de la primera cuota (ISO date) */
   firstDueDate: string;
   /** Día del mes para periodicidad mensual */

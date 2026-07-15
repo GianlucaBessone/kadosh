@@ -12,15 +12,25 @@ import { TransactionCard } from '@/components/transactions/TransactionCard';
 import { NextCommitmentCard } from '@/features/planning/components/NextCommitmentCard';
 import { commitmentAppliesToMonth, getDueDateForMonth } from '@/features/planning/utils/dateUtils';
 import type { FinancialCommitment } from '@/lib/db';
+import { PlanningModeModal } from '@/components/onboarding/PlanningModeModal';
+import { PeriodSelector } from '@/components/shared/PeriodSelector';
+import type { PlanningPeriod } from '@/features/planning/types';
 
 export default function HomePage() {
   const [isMounted, setIsMounted] = useState(false);
   const [expandedSection, setExpandedSection] = useState<'balance'|'incomes'|'expenses'|'tithe'|null>(null);
+  
+  const [tithePct, setTithePct] = useState<number>(10);
+  const [titheAmt, setTitheAmt] = useState<number | null>(null);
+  const [selectedPeriod, setSelectedPeriod] = useState<PlanningPeriod>('MONTH');
 
-  // Hydration fix
+  // Hydration fix and read local settings
   useEffect(() => {
-    // eslint-disable-next-line
     setIsMounted(true);
+    const pctStr = localStorage.getItem('kadosh_tithe_pct');
+    if (pctStr) setTithePct(parseFloat(pctStr));
+    const amtStr = localStorage.getItem('kadosh_tithe_amt');
+    if (amtStr) setTitheAmt(parseFloat(amtStr));
   }, []);
 
   // Cierra la sección expandida al tocar en cualquier lado de la pantalla
@@ -62,17 +72,44 @@ export default function HomePage() {
   currentMonthStart.setDate(1);
   currentMonthStart.setHours(0, 0, 0, 0);
   
+  const settings = useLiveQuery(() => db.settings.orderBy('id').first());
+
   const currentMonthTx = useLiveQuery(() => 
     db.transactions.where('date').aboveOrEqual(currentMonthStart.toISOString()).toArray()
   ) || [];
 
-  const incomes = currentMonthTx.filter(t => t.type === 'INCOME').reduce((acc, t) => acc + t.amount, 0);
-  const expenses = currentMonthTx.filter(t => t.type === 'EXPENSE').reduce((acc, t) => acc + t.amount, 0);
+  const filteredTx = currentMonthTx.filter(tx => {
+    if (selectedPeriod === 'MONTH') return true;
+    const txDate = new Date(tx.date);
+    const day = txDate.getDate();
+    return selectedPeriod === 'Q1' ? (day >= 1 && day <= 15) : (day >= 16);
+  });
+
+  const incomes = filteredTx.filter(t => t.type === 'INCOME' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
+  const expenses = filteredTx.filter(t => t.type === 'EXPENSE' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
 
   const activeSeedsCount = useLiveQuery(() => db.seedGoals.where('status').equals('ACTIVE').count()) || 0;
 
   const user = useLiveQuery(() => db.users.orderBy('id').first());
   const userName = user?.name ? user.name.split(' ')[0] : 'Usuario';
+
+  const currentMonthVal = currentMonthStart.getMonth() + 1;
+  const currentYearVal = currentMonthStart.getFullYear();
+  const tithesThisMonth = useLiveQuery(() => {
+    if (!user?.id) return [];
+    return db.tithes.where('[month+year]').equals([currentMonthVal, currentYearVal]).filter(t => t.userId === user.id).toArray();
+  }, [user?.id, currentMonthVal, currentYearVal]) || [];
+
+  const filteredTithes = tithesThisMonth.filter(t => {
+    if (selectedPeriod === 'MONTH') return true;
+    const tDate = new Date(t.date);
+    const day = tDate.getDate();
+    return selectedPeriod === 'Q1' ? (day >= 1 && day <= 15) : (day >= 16);
+  });
+
+  const totalPaidTithe = filteredTithes.reduce((acc, t) => acc + t.amount, 0);
+  const suggestedTithe = titheAmt !== null ? titheAmt : (incomes * (tithePct / 100));
+  const pendingTithe = Math.max(0, suggestedTithe - totalPaidTithe);
 
   // Next upcoming commitment
   const nextCommitmentData = useLiveQuery<{ commitment: FinancialCommitment; dueDate: Date } | null>(async () => {
@@ -120,6 +157,10 @@ export default function HomePage() {
         <h2 className="text-4xl sm:text-5xl font-bold tracking-tighter text-foreground truncate max-w-full transition-all duration-300">
           {expandedSection === 'balance' ? formatMoney(totalBalance) : formatMoneyCompact(totalBalance)}
         </h2>
+      </div>
+
+      <div className="mb-2">
+        <PeriodSelector value={selectedPeriod} onChange={setSelectedPeriod} />
       </div>
 
       {/* Resumen del Mes */}
@@ -186,7 +227,7 @@ export default function HomePage() {
                 <span className="text-xs font-semibold uppercase tracking-wider truncate">Diezmo</span>
               </div>
               <span className="text-base sm:text-lg font-bold text-foreground tracking-tight truncate transition-all duration-300">
-                {expandedSection === 'tithe' ? formatMoney(0) : formatMoneyCompact(0)}
+                {expandedSection === 'tithe' ? formatMoney(pendingTithe) : formatMoneyCompact(pendingTithe)}
               </span>
               <span className="text-[10px] text-muted-foreground truncate">Pendiente</span>
             </CardContent>
@@ -261,6 +302,14 @@ export default function HomePage() {
           ))}
         </div>
       </div>
+      {settings && !settings.hasSelectedPlanningMode && (
+        <PlanningModeModal 
+          settings={settings} 
+          onComplete={() => {
+            // forces re-render if needed, but Dexie hook will update
+          }} 
+        />
+      )}
     </div>
   );
 }
