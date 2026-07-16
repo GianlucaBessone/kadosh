@@ -225,7 +225,7 @@ export default function ProfilePage() {
   const [showExport, setShowExport] = useState(false);
 
   const updateSetting = async (patch: Partial<typeof settings>) => {
-    if (!settings || !user) return;
+    if (!user) return;
     if (settings) {
       await db.settings.update(settings.id, {
         ...patch,
@@ -367,7 +367,7 @@ export default function ProfilePage() {
                 Modo de Planificación
               </Label>
             </div>
-            <div className="flex items-center gap-2 w-full mt-1">
+            <div className="flex flex-col sm:flex-row items-center gap-2 w-full mt-1">
               <Button 
                 variant={settings?.planningMode === 'MONTHLY' || !settings?.planningMode ? 'default' : 'outline'} 
                 className="w-full font-semibold rounded-xl"

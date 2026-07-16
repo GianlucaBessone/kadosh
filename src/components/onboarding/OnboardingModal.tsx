@@ -226,10 +226,9 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
   // ── Swipe / drag support ────────────────────
   const [dragStartX, setDragStartX] = useState<number | null>(null);
 
-  const onPointerDown = (e: React.PointerEvent) => setDragStartX(e.clientX);
-  const onPointerUp = (e: React.PointerEvent) => {
+  const handleSwipe = (clientX: number) => {
     if (dragStartX === null) return;
-    const delta = dragStartX - e.clientX;
+    const delta = dragStartX - clientX;
     if (Math.abs(delta) > 50) {
       if (delta > 0 && !isLast) goNext();
       else if (delta < 0 && !isFirst) {
@@ -239,6 +238,12 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
     }
     setDragStartX(null);
   };
+
+  const onTouchStart = (e: React.TouchEvent) => setDragStartX(e.touches[0].clientX);
+  const onTouchEnd = (e: React.TouchEvent) => handleSwipe(e.changedTouches[0].clientX);
+
+  const onMouseDown = (e: React.MouseEvent) => setDragStartX(e.clientX);
+  const onMouseUp = (e: React.MouseEvent) => handleSwipe(e.clientX);
 
   if (!visible) return null;
 
@@ -256,9 +261,11 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col bg-background overflow-hidden"
-      onPointerDown={onPointerDown}
-      onPointerUp={onPointerUp}
+      className="fixed inset-0 z-[9999] flex flex-col bg-background overflow-hidden touch-pan-y"
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+      onMouseDown={onMouseDown}
+      onMouseUp={onMouseUp}
       aria-modal="true"
       role="dialog"
       aria-label="Bienvenida a KADOSH"
