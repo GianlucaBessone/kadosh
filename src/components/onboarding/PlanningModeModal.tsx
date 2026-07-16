@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import type { Settings } from '@/lib/db';
 
 interface PlanningModeModalProps {
-  settings: Settings;
+  settings?: Settings | null;
   onComplete: () => void;
 }
 
@@ -20,11 +20,31 @@ export function PlanningModeModal({ settings, onComplete }: PlanningModeModalPro
     if (!selected) return;
     setLoading(true);
     try {
-      await db.settings.update(settings.id, {
-        planningMode: selected,
-        hasSelectedPlanningMode: true,
-        updatedAt: new Date().toISOString()
-      });
+      if (settings) {
+        await db.settings.update(settings.id, {
+          planningMode: selected,
+          hasSelectedPlanningMode: true,
+          updatedAt: new Date().toISOString()
+        });
+      } else {
+        const user = await db.users.orderBy('id').first();
+        if (user) {
+          await db.settings.add({
+            id: crypto.randomUUID(),
+            userId: user.id,
+            planningMode: selected,
+            hasSelectedPlanningMode: true,
+            theme: 'light',
+            notifications: true,
+            dailyVerse: true,
+            showReflection: true,
+            offlineDownload: true,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            deletedAt: null,
+          });
+        }
+      }
       onComplete();
     } catch (e) {
       console.error(e);

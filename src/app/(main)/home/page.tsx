@@ -73,7 +73,7 @@ export default function HomePage() {
   currentMonthStart.setDate(1);
   currentMonthStart.setHours(0, 0, 0, 0);
   
-  const settings = useLiveQuery(() => db.settings.orderBy('id').first());
+  const settingsQuery = useLiveQuery(() => db.settings.orderBy('id').first(), [], 'LOADING' as any) as any;
 
   const currentMonthTx = useLiveQuery(() => 
     db.transactions.where('date').aboveOrEqual(currentMonthStart.toISOString()).toArray()
@@ -310,9 +310,9 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-      {settings && !settings.hasSelectedPlanningMode && (
+      {settingsQuery !== 'LOADING' && (!settingsQuery || !settingsQuery.hasSelectedPlanningMode) && (
         <PlanningModeModal 
-          settings={settings} 
+          settings={settingsQuery === 'LOADING' ? undefined : settingsQuery} 
           onComplete={() => {
             // forces re-render if needed, but Dexie hook will update
           }} 
