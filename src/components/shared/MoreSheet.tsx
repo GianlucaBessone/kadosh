@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Settings, ChevronDown, CalendarDays, Building2, User } from 'lucide-react';
+import { X, Settings, ChevronDown, CalendarDays, Building2, User, LifeBuoy } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -67,6 +67,13 @@ export function MoreSheet({ isOpen, onClose }: MoreSheetProps) {
       description: 'Cuentas y activos',
       href: '/accounts',
       available: false,
+    },
+    {
+      icon: LifeBuoy,
+      label: 'Asistencia',
+      description: 'Ayuda, Contacto e Información',
+      href: '/asistencia',
+      available: true,
     },
   ];
 

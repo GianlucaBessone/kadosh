@@ -9,35 +9,41 @@ datasource db {
 }
 
 model User {
-  id        String   @id @default(uuid()) @db.Uuid
-  email     String   @unique
+  id        String    @id @default(uuid()) @db.Uuid
+  email     String    @unique
   name      String?
   lastName  String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   // Relations
-  accounts          Account[]
-  categories        Category[]
-  transactions      Transaction[]
-  seedGoals         SeedGoal[]
-  tithes            Tithe[]
-  notifications     Notification[]
-  settings          Settings?
+  accounts      Account[]
+  categories    Category[]
+  transactions  Transaction[]
+  seedGoals     SeedGoal[]
+  tithes        Tithe[]
+  notifications Notification[]
+  settings      Settings?
+
+  supportTickets        SupportTicket[]
+  feedbacks             Feedback[]
+  donations             Donation[]
+  prayers               Prayer[]
+  developerInfoRequests DeveloperInfoRequest[]
 }
 
 model Settings {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @unique @db.Uuid
-  theme             String   @default("light") // light, dark, system
-  notifications     Boolean  @default(true)
-  dailyVerse        Boolean  @default(true)
-  showReflection    Boolean  @default(true)
-  offlineDownload   Boolean  @default(true)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
-  deletedAt         DateTime?
+  id              String    @id @default(uuid()) @db.Uuid
+  userId          String    @unique @db.Uuid
+  theme           String    @default("light") // light, dark, system
+  notifications   Boolean   @default(true)
+  dailyVerse      Boolean   @default(true)
+  showReflection  Boolean   @default(true)
+  offlineDownload Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
@@ -55,137 +61,137 @@ enum VerseCategory {
 }
 
 model Account {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  name        String
-  balance     Float    @default(0)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  name      String
+  balance   Float     @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 }
 
 model Category {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  name        String
-  type        String   // "INCOME" | "EXPENSE"
-  icon        String?
-  color       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  name      String
+  type      String // "INCOME" | "EXPENSE"
+  icon      String?
+  color     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   transactions Transaction[]
 }
 
 model Transaction {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  accountId   String   @db.Uuid
-  categoryId  String?  @db.Uuid
-  type        String   // "INCOME" | "EXPENSE" | "TRANSFER"
-  amount      Float
-  date        DateTime @default(now())
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String    @db.Uuid
+  accountId  String    @db.Uuid
+  categoryId String?   @db.Uuid
+  type       String // "INCOME" | "EXPENSE" | "TRANSFER"
+  amount     Float
+  date       DateTime  @default(now())
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
 
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account     Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  category    Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
 }
 
 model SeedGoal {
-  id             String   @id @default(uuid()) @db.Uuid
-  userId         String   @db.Uuid
-  name           String
-  targetAmount   Float
-  currentAmount  Float    @default(0)
-  targetDate     DateTime?
-  status         String   @default("ACTIVE") // ACTIVE, HARVESTED
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
-  deletedAt      DateTime?
+  id            String    @id @default(uuid()) @db.Uuid
+  userId        String    @db.Uuid
+  name          String
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  targetDate    DateTime?
+  status        String    @default("ACTIVE") // ACTIVE, HARVESTED
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
 
   user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   contributions SeedContribution[]
 }
 
 model SeedContribution {
-  id          String   @id @default(uuid()) @db.Uuid
-  seedGoalId  String   @db.Uuid
-  amount      Float
-  date        DateTime @default(now())
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id         String    @id @default(uuid()) @db.Uuid
+  seedGoalId String    @db.Uuid
+  amount     Float
+  date       DateTime  @default(now())
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
 
   seedGoal SeedGoal @relation(fields: [seedGoalId], references: [id], onDelete: Cascade)
 }
 
 model Tithe {
-  id          String   @id @default(uuid()) @db.Uuid
-  userId      String   @db.Uuid
-  amount      Float
-  date        DateTime @default(now())
-  month       Int
-  year        Int
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  deletedAt   DateTime?
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  amount    Float
+  date      DateTime  @default(now())
+  month     Int
+  year      Int
+  notes     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  deletedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model DailyVerse {
-  id          String        @id @default(uuid()) @db.Uuid
-  reference   String
-  book        String
-  chapter     Int
-  verseStart  Int
-  verseEnd    Int?
-  category    VerseCategory
-  theme       String
-  text        String
-  reflection  String?
-  dayOfYear   Int           // 1-365
-  active      Boolean       @default(true)
-  isFavorite  Boolean       @default(false)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
-  deletedAt   DateTime?
+  id         String        @id @default(uuid()) @db.Uuid
+  reference  String
+  book       String
+  chapter    Int
+  verseStart Int
+  verseEnd   Int?
+  category   VerseCategory
+  theme      String
+  text       String
+  reflection String?
+  dayOfYear  Int // 1-365
+  active     Boolean       @default(true)
+  isFavorite Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+  deletedAt  DateTime?
 }
 
 model Notification {
-  id        String   @id @default(uuid()) @db.Uuid
-  userId    String   @db.Uuid
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
   title     String
   message   String
-  read      Boolean  @default(false)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  read      Boolean   @default(false)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model NotificationIntent {
-  id              String   @id @default(uuid()) @db.Uuid
-  userHash        String   // OneSignal external_id / user hash
-  title           String
-  message         String
-  targetTimeUtc   DateTime
-  commitmentId    String?  // Reference to local IndexedDB ID, used to deduplicate/cancel
-  sent            Boolean  @default(false)
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id            String   @id @default(uuid()) @db.Uuid
+  userHash      String // OneSignal external_id / user hash
+  title         String
+  message       String
+  targetTimeUtc DateTime
+  commitmentId  String? // Reference to local IndexedDB ID, used to deduplicate/cancel
+  sent          Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 }
 
 model InactivityTracker {
@@ -195,4 +201,104 @@ model InactivityTracker {
   lastPulseAt     DateTime @default(now())
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
+}
+
+// ─── Support Ticket ──────────────────────────────────
+model SupportTicket {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String?  @db.Uuid
+  guestId       String?
+  type          String // "BUG" | "FEATURE" | "QUESTION"
+  subject       String
+  description   String
+  screenshotUrl String?
+  appVersion    String?
+  browser       String?
+  os            String?
+  language      String?
+  resolution    String?
+  status        String   @default("OPEN") // OPEN | IN_PROGRESS | RESOLVED | CLOSED
+  priority      String   @default("NORMAL") // LOW | NORMAL | HIGH | URGENT
+  adminNotes    String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Feedback ────────────────────────────────────────
+model Feedback {
+  id          String   @id @default(uuid()) @db.Uuid
+  userId      String?  @db.Uuid
+  guestId     String?
+  type        String // "COMMENT" | "NPS"
+  npsScore    Int? // 0-10
+  bestPart    String?
+  improvement String?
+  comment     String?
+  status      String   @default("NEW") // NEW | REVIEWED | ARCHIVED
+  adminNotes  String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Donation ────────────────────────────────────────
+model Donation {
+  id            String   @id @default(uuid()) @db.Uuid
+  userId        String   @db.Uuid
+  amount        Float
+  currency      String   @default("ARS")
+  paymentMethod String?
+  status        String   @default("PENDING") // PENDING | COMPLETED | FAILED | REFUNDED
+  externalId    String? // ID de la pasarela de pago
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Prayer ──────────────────────────────────────────
+model Prayer {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @db.Uuid
+  guestId   String?
+  createdAt DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Developer Info Request ──────────────────────────
+model DeveloperInfoRequest {
+  id         String    @id @default(uuid()) @db.Uuid
+  userId     String?   @db.Uuid
+  guestId    String?
+  status     String    @default("PENDING") // PENDING | NOTIFIED | SEEN
+  notifiedAt DateTime?
+  seenAt     DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── App Config ──────────────────────────────────────
+model AppConfig {
+  key       String   @id
+  value     String
+  type      String   @default("STRING") // STRING | BOOLEAN | NUMBER | JSON
+  label     String? // Etiqueta legible para el admin
+  category  String   @default("GENERAL")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── Admin ───────────────────────────────────────────
+model Admin {
+  id        String   @id @default(uuid()) @db.Uuid
+  email     String   @unique
+  name      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }

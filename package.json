@@ -21,6 +21,8 @@
     "clsx": "^2.1.1",
     "dexie": "^4.4.4",
     "dexie-react-hooks": "^4.4.0",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
     "framer-motion": "^12.42.2",
     "html-to-image": "^1.11.13",
     "jspdf": "^4.2.1",
