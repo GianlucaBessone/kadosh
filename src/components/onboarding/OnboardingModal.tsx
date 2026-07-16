@@ -15,7 +15,11 @@ import {
   Sparkles,
   ArrowRight,
   CalendarDays,
+  Smartphone,
+  Share,
+  PlusSquare,
 } from 'lucide-react';
+import { usePWA } from '@/hooks/usePWA';
 
 // ─────────────────────────────────────────────
 // Types
@@ -183,6 +187,10 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1); // 1 = forward, -1 = backward
   const [startTour, setStartTour] = useState(false);
+  const [showPWAInstall, setShowPWAInstall] = useState(false);
+  const [pendingAction, setPendingAction] = useState<'enter' | 'tour' | null>(null);
+
+  const { isIOS, isStandalone, deferredPrompt, promptInstall } = usePWA();
 
   // Check on mount
   useEffect(() => {
@@ -209,19 +217,62 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
     onComplete?.();
   }, [onComplete]);
 
-  const handleEnter = useCallback(() => {
-    markOnboardingDone();
-    setVisible(false);
-    onComplete?.();
-  }, [onComplete]);
+  const finishOnboarding = useCallback(
+    (action: 'enter' | 'tour') => {
+      setVisible(false);
+      if (action === 'tour') {
+        setStartTour(true);
+        // TODO: launch interactive tour
+      }
+      onComplete?.();
+    },
+    [onComplete]
+  );
 
-  const handleTour = useCallback(() => {
-    markOnboardingDone();
-    setStartTour(true);
-    setVisible(false);
-    // TODO: launch interactive tour
-    onComplete?.();
-  }, [onComplete]);
+  const handleAction = useCallback(
+    (action: 'enter' | 'tour') => {
+      markOnboardingDone();
+
+      let pwaPromptShown = false;
+      try {
+        pwaPromptShown = localStorage.getItem('kadosh_pwa_prompt_shown') === '1';
+      } catch {
+        // ignore
+      }
+
+      if (!isStandalone && !pwaPromptShown && (deferredPrompt || isIOS)) {
+        setPendingAction(action);
+        setDirection(1);
+        setShowPWAInstall(true);
+      } else {
+        finishOnboarding(action);
+      }
+    },
+    [isStandalone, deferredPrompt, isIOS, finishOnboarding]
+  );
+
+  const handleEnter = useCallback(() => handleAction('enter'), [handleAction]);
+  const handleTour = useCallback(() => handleAction('tour'), [handleAction]);
+
+  const closePWAPrompt = useCallback(() => {
+    try {
+      localStorage.setItem('kadosh_pwa_prompt_shown', '1');
+    } catch {
+      // ignore
+    }
+    if (pendingAction) {
+      finishOnboarding(pendingAction);
+    } else {
+      finishOnboarding('enter');
+    }
+  }, [pendingAction, finishOnboarding]);
+
+  const handlePWAInstallClick = async () => {
+    if (deferredPrompt) {
+      await promptInstall();
+      closePWAPrompt();
+    }
+  };
 
   // ── Swipe / drag support ────────────────────
   const [dragStartX, setDragStartX] = useState<number | null>(null);
@@ -258,6 +309,94 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
       opacity: 0,
     }),
   };
+
+  // Render PWA Install View if needed
+  if (showPWAInstall) {
+    return (
+      <div
+        className="fixed inset-0 z-[9999] flex flex-col bg-background overflow-hidden touch-pan-y"
+        aria-modal="true"
+        role="dialog"
+      >
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute -top-24 -left-24 w-72 h-72 rounded-full bg-primary/8 blur-3xl" />
+          <div className="absolute -bottom-20 -right-20 w-80 h-80 rounded-full bg-primary/8 blur-3xl" />
+        </div>
+
+        <div className="relative z-10 flex items-center justify-center px-6 pt-safe pt-10 pb-4 h-14" />
+
+        <div className="relative flex-1 overflow-hidden">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key="pwa-install"
+              initial={{ x: '100%', opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ duration: 0.35, ease: [0.32, 0.72, 0, 1] }}
+              className="absolute inset-0 flex flex-col items-center justify-center px-8 text-center"
+            >
+              <div className="relative mb-8 flex h-28 w-28 items-center justify-center rounded-3xl bg-gradient-to-br from-primary/20 to-primary/5 shadow-lg">
+                <div className="absolute inset-0 rounded-3xl ring-1 ring-foreground/5" />
+                <span className="text-primary"><Smartphone className="h-10 w-10" /></span>
+              </div>
+
+              <h2 className="text-2xl font-bold leading-tight text-foreground mb-4">
+                Instalá Kadosh
+              </h2>
+
+              {isIOS ? (
+                <div className="text-sm leading-relaxed text-muted-foreground max-w-xs text-left w-full mx-auto space-y-4">
+                  <p className="text-center mb-2">Para instalar Kadosh en tu iPhone:</p>
+                  <ol className="space-y-4">
+                    <li className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/5 text-foreground">
+                        <Share className="h-4 w-4" />
+                      </div>
+                      <span>Tocá el botón <strong>Compartir</strong> de Safari.</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/5 text-foreground">
+                        <PlusSquare className="h-4 w-4" />
+                      </div>
+                      <span>Seleccioná <strong>Agregar a pantalla de inicio</strong>.</span>
+                    </li>
+                    <li className="flex items-center gap-3">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground/5 text-foreground">
+                        <Smartphone className="h-4 w-4" />
+                      </div>
+                      <span>Confirmá la instalación.</span>
+                    </li>
+                  </ol>
+                </div>
+              ) : (
+                <p className="text-sm leading-relaxed text-muted-foreground max-w-xs whitespace-pre-line">
+                  Accedé a Kadosh directamente desde la pantalla de inicio de tu celular, con una experiencia más rápida, similar a una aplicación nativa y con funcionamiento offline.
+                </p>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        <div className="relative z-10 px-6 pb-safe pb-10 pt-4">
+          <div className="flex flex-col gap-3">
+            {!isIOS && (
+              <button
+                onClick={handlePWAInstallClick}
+                className="flex w-full items-center justify-center gap-2 rounded-full bg-primary px-6 py-4 text-sm font-semibold text-primary-foreground shadow-lg shadow-primary/25 transition-all active:scale-95 hover:bg-primary/90"
+              >
+                Instalar ahora
+              </button>
+            )}
+            <button
+              onClick={closePWAPrompt}
+              className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-card px-6 py-4 text-sm font-semibold text-foreground shadow-sm transition-all active:scale-95 hover:bg-muted"
+            >
+              {isIOS ? 'Entendido' : 'Ahora no'}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div
