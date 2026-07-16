@@ -10,6 +10,7 @@ import { MoneyInput } from '@/components/ui/MoneyInput'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { SeedService } from '@/services/seedService'
 import { db } from '@/lib/db'
+import { soundService } from '@/lib/SoundService'
 
 export default function NewSeedPage() {
   const router = useRouter();
@@ -36,6 +37,7 @@ export default function NewSeedPage() {
         targetDate: null
       });
       
+      soundService.play('success');
       router.push('/seeds');
     }
   }

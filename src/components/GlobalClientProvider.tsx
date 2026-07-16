@@ -10,6 +10,8 @@ import { db } from '@/lib/db';
 import { DailyVerseService } from '@/features/daily-verse/service';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
+import { soundService } from '@/lib/SoundService';
+import { Toaster } from '@/components/ui/sonner';
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/registro', '/welcome']);
 
@@ -52,6 +54,9 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
 
     // Init Daily Verses
     DailyVerseService.initializeDatabase();
+    
+    // Init SoundService configuration
+    soundService.reloadSettings();
 
     return () => {
       syncEngine.stop();
@@ -96,6 +101,7 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
       <ThemeApplier />
       {pathname !== '/welcome' && <OnboardingModal />}
       {children}
+      <Toaster />
     </TooltipProvider>
   );
 }

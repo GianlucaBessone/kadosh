@@ -15,6 +15,8 @@ import { SeedService } from '@/services/seedService'
 import { formatMoney, cn } from '@/lib/utils'
 import { MoneyInput } from '@/components/ui/MoneyInput'
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
+import { soundService } from '@/lib/SoundService'
+import { toast } from 'sonner'
 
 export default function SeedDetailPage() {
   const params = useParams<{ id: string }>();
@@ -57,7 +59,10 @@ export default function SeedDetailPage() {
     const amount = parseFloat(amountStr);
     if (!isNaN(amount) && amount > 0) {
       await SeedService.waterSeed(seed.id, amount);
+      soundService.play('success');
       form.reset();
+    } else {
+      soundService.play('error');
     }
   }
 
@@ -70,15 +75,18 @@ export default function SeedDetailPage() {
     const amount = parseFloat(amountStr);
     if (!isNaN(amount) && amount > 0 && amount <= seed.currentAmount) {
       await SeedService.withdrawSeed(seed.id, amount);
+      soundService.play('success');
       form.reset();
     } else {
-      alert('Monto inválido o superior al disponible.');
+      soundService.play('error');
+      toast.error('Monto inválido o superior al disponible.');
     }
   }
 
   const handleHarvest = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     await SeedService.harvestSeed(seed.id);
+    soundService.play('goal');
   }
 
   const handleDelete = async (restoreBalance: boolean) => {
@@ -86,6 +94,7 @@ export default function SeedDetailPage() {
     setDeleting(true);
     try {
       await SeedService.deleteSeed(seed.id, restoreBalance);
+      soundService.play('delete');
       router.replace('/seeds');
     } catch (e) {
       console.error(e);

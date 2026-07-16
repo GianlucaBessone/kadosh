@@ -42,6 +42,7 @@ export function useTheme() {
         dailyVerse: true,
         showReflection: true,
         offlineDownload: true,
+        soundEffects: true,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
         deletedAt: null,

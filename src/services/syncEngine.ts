@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { soundService } from '@/lib/SoundService';
 
 export class SyncEngine {
   private isSyncing = false;
@@ -48,6 +49,7 @@ export class SyncEngine {
     try {
       await this.pushChanges();
       await this.pullChanges();
+      soundService.play('success');
     } catch (error: any) {
       if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message === 'Load failed')) {
         console.log('Sync paused: device is offline or server unreachable.');

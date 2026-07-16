@@ -11,6 +11,8 @@ import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { COMMITMENT_TYPE_LABELS, PERIODICITY_LABELS, STATUS_LABELS } from '@/features/planning/types';
 import { formatFullDate } from '@/features/planning/utils/dateUtils';
 import Link from 'next/link';
+import { soundService } from '@/lib/SoundService';
+import { toast } from 'sonner';
 
 export default function CommitmentDetailPage() {
   const [isMounted, setIsMounted] = useState(false);
@@ -38,7 +40,7 @@ export default function CommitmentDetailPage() {
     
     if (!indefinite) {
       if (typeof pausePeriods !== 'number' || pausePeriods <= 0) {
-         alert("Por favor ingresa un número válido mayor a 0.");
+         toast.error("Por favor ingresa un número válido mayor a 0.");
          return;
       }
       const now = new Date();
@@ -59,6 +61,7 @@ export default function CommitmentDetailPage() {
     setPausing(true);
     try {
       await PlanningService.pauseCommitment(id, untilDate);
+      soundService.play('success');
       setShowPauseModal(false);
     } catch (e) {
       console.error(e);
@@ -72,6 +75,7 @@ export default function CommitmentDetailPage() {
     setDeleting(true);
     try {
       await PlanningService.hardDeleteCommitment(id);
+      soundService.play('delete');
       router.replace('/planning');
     } catch (e) {
       console.error(e);
@@ -84,6 +88,7 @@ export default function CommitmentDetailPage() {
     setDeleting(true);
     try {
       await PlanningService.cancelFutureCommitments(id);
+      soundService.play('delete');
       router.replace('/planning');
     } catch (e) {
       console.error(e);

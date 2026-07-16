@@ -53,6 +53,7 @@ export interface Settings {
   dailyVerse: boolean;
   showReflection: boolean;
   offlineDownload: boolean;
+  soundEffects: boolean;
   planningMode?: 'MONTHLY' | 'BIWEEKLY';
   hasSelectedPlanningMode?: boolean;
   createdAt: string;

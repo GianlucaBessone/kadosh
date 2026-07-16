@@ -3,7 +3,7 @@
 import { useRef, useState } from 'react';
 import {
   User, Moon, Bell, Download, LogOut, BookOpen,
-  Camera, Mail, Sun, ChevronRight, Loader2, CalendarDays,
+  Camera, Mail, Sun, ChevronRight, Loader2, CalendarDays, Volume2
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -240,6 +240,7 @@ export default function ProfilePage() {
         dailyVerse: true,
         showReflection: true,
         offlineDownload: true,
+        soundEffects: true,
         ...patch,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -305,6 +306,28 @@ export default function ProfilePage() {
                 id="notifications"
                 checked={settings?.notifications ?? true}
                 onCheckedChange={(checked) => updateSetting({ notifications: checked })}
+              />
+            </div>
+
+            {/* Sonidos */}
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 p-2 rounded-full text-primary">
+                  <Volume2 className="w-4 h-4" />
+                </div>
+                <Label htmlFor="sound-effects" className="text-sm font-medium">
+                  Efectos de Sonido
+                </Label>
+              </div>
+              <Switch
+                id="sound-effects"
+                checked={settings?.soundEffects ?? true}
+                onCheckedChange={async (checked) => {
+                  await updateSetting({ soundEffects: checked });
+                  const { soundService } = await import('@/lib/SoundService');
+                  soundService.reloadSettings();
+                  if (checked) soundService.play('success');
+                }}
               />
             </div>
 

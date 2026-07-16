@@ -13,6 +13,8 @@ import { TransactionService } from '@/services/transactionService';
 import { db } from '@/lib/db';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { MotivationalModal } from '@/components/transactions/MotivationalModal';
+import { soundService } from '@/lib/SoundService';
+import { toast } from 'sonner';
 
 export default function RegisterTransactionPage() {
   const router = useRouter();
@@ -20,6 +22,7 @@ export default function RegisterTransactionPage() {
   const [loading, setLoading] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
   const [showMotivationalModal, setShowMotivationalModal] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -32,6 +35,7 @@ export default function RegisterTransactionPage() {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>, type: 'INCOME' | 'EXPENSE' | 'TRANSFER') => {
     e.preventDefault();
     setLoading(true);
+    setError(null);
 
     try {
       const formData = new FormData(e.currentTarget);
@@ -42,7 +46,8 @@ export default function RegisterTransactionPage() {
 
       const amount = parseFloat(amountStr);
       if (isNaN(amount) || amount <= 0) {
-        alert('Monto inválido');
+        soundService.play('error');
+        setError('El monto ingresado es inválido o debe ser mayor a 0.');
         setLoading(false);
         return;
       }
@@ -78,6 +83,8 @@ export default function RegisterTransactionPage() {
         notes,
       });
 
+      soundService.play('success');
+
       if (type === 'INCOME') {
         const now = new Date();
         const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
@@ -99,8 +106,8 @@ export default function RegisterTransactionPage() {
 
       router.push('/home');
     } catch (error) {
-      console.error(error);
-      alert('Error al guardar la transacción');
+      setError(error instanceof Error ? error.message : 'Error desconocido');
+      toast.error('Error al guardar la transacción');
     } finally {
       setLoading(false);
     }
@@ -124,6 +131,12 @@ export default function RegisterTransactionPage() {
           <TabsTrigger value="expense" className="rounded-full data-[state=active]:bg-card data-[state=active]:text-destructive data-[state=active]:shadow-sm">Gasto</TabsTrigger>
           <TabsTrigger value="income" className="rounded-full data-[state=active]:bg-card data-[state=active]:text-success data-[state=active]:shadow-sm">Ingreso</TabsTrigger>
         </TabsList>
+
+        {error && (
+          <div className="mt-4 p-3 bg-destructive/10 text-destructive border border-destructive/20 rounded-xl text-sm font-medium animate-in fade-in slide-in-from-top-2">
+            {error}
+          </div>
+        )}
 
         {/* GASTO */}
         <TabsContent value="expense" className="mt-6 space-y-6">
