@@ -69,7 +69,7 @@ class SoundService {
       for (const [type, path] of Object.entries(soundFiles)) {
         const audio = new Audio(path);
         audio.preload = 'auto';
-        audio.volume = 0.5; // low volume
+        audio.volume = 1.0; // max volume
         // Play and immediately pause to unlock in iOS
         audio.play().then(() => {
           audio.pause();

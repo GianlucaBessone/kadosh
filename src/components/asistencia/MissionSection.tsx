@@ -6,7 +6,7 @@ export function MissionSection() {
   return (
     <Card className="rounded-3xl border-border/50 shadow-sm overflow-hidden">
       <CardContent className="p-5 flex flex-col gap-6">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3 text-center">
           <div className="bg-primary/10 p-2 rounded-full text-primary">
             <Compass className="w-5 h-5" />
           </div>
@@ -15,8 +15,8 @@ export function MissionSection() {
 
         {/* Subsección: Propósito */}
         <div className="space-y-2">
-          <h3 className="font-medium text-foreground">El propósito de KADOSH</h3>
-          <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-2xl">
+          <h3 className="font-medium text-foreground text-center">El propósito de KADOSH</h3>
+          <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-2xl text-center">
             <p>
               Próximamente compartiremos un artículo detallado sobre el propósito que dio origen a esta aplicación y cómo buscamos bendecir a otros.
             </p>
@@ -25,8 +25,8 @@ export function MissionSection() {
 
         {/* Subsección: Visión */}
         <div className="space-y-2">
-          <h3 className="font-medium text-foreground">Nuestra visión</h3>
-          <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-2xl">
+          <h3 className="font-medium text-foreground text-center">Nuestra visión</h3>
+          <div className="text-sm text-muted-foreground p-3 bg-muted/30 rounded-2xl text-center">
             <p>
               Próximamente compartiremos nuestra visión sobre el futuro de KADOSH y hacia dónde nos dirigimos.
             </p>
@@ -35,9 +35,9 @@ export function MissionSection() {
 
         {/* Subsección: Quién desarrolla */}
         <div className="space-y-4 pt-2">
-          <h3 className="font-medium text-foreground">Quién desarrolla KADOSH</h3>
+          <h3 className="font-medium text-foreground text-center">Quién desarrolla KADOSH</h3>
           
-          <div className="text-sm text-muted-foreground space-y-4">
+          <div className="text-sm text-muted-foreground space-y-4 text-center">
             <p>
               Procuramos desarrollar esta aplicación con un espíritu de servicio, buscando hacer cada tarea como para el Señor y no para recibir reconocimiento personal.
             </p>

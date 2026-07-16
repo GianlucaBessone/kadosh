@@ -72,7 +72,7 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900 p-4">
       <Card className="w-full max-w-md shadow-xl border-slate-200 dark:border-slate-800">
-        <form onSubmit={handleLogin}>
+        <form onSubmit={handleLogin} noValidate>
           <CardHeader className="space-y-1 text-center pb-6">
             <h1 className="text-3xl font-bold tracking-tight text-primary mb-2">KADOSH</h1>
             <CardTitle className="text-2xl">Panel de Administración</CardTitle>

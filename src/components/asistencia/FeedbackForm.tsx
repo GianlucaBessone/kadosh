@@ -73,7 +73,7 @@ export function FeedbackForm({ isOpen, onClose }: FeedbackFormProps) {
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <DialogHeader>
               <DialogTitle>Enviar comentario</DialogTitle>
               <DialogDescription>

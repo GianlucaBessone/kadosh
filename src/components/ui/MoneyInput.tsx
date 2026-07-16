@@ -109,7 +109,7 @@ export function MoneyInput({
     else if (len > 8) dynamicSizeClass = 'text-2xl';
   }
 
-  const isPlain = plain || baseTextSize.includes('text-base') || baseTextSize.includes('text-sm');
+  const isPlain = plain !== undefined ? plain : (baseTextSize.includes('text-base') || baseTextSize.includes('text-sm'));
 
   // Establecer el ancho del input de forma dinámica para que no se corte
   // Usaremos un ancho del 100% y que dependa del contenedor (flexbox)
@@ -123,7 +123,7 @@ export function MoneyInput({
         onChange={handleChange}
         className={cn(
           "bg-transparent border-none outline-none caret-foreground transition-all duration-200 w-full min-w-0 font-numbers tracking-tight",
-          !isPlain && "text-center text-transparent",
+          !isPlain && "text-center text-transparent placeholder:text-transparent",
           dynamicSizeClass,
           className
         )}

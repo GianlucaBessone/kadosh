@@ -44,13 +44,13 @@ export function PrayerSection() {
   return (
     <Card className="rounded-3xl border-border/50 shadow-sm overflow-hidden">
       <CardContent className="p-5 flex flex-col gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3 text-center">
           <div className="bg-primary/10 p-2 rounded-full text-primary">
             <HandHeart className="w-5 h-5" />
           </div>
           <h2 className="text-lg font-semibold text-foreground">Orar por este proyecto</h2>
         </div>
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-3 text-sm text-muted-foreground text-center">
           <p>
             Si KADOSH ha sido de bendición para tu vida, tu oración vale mucho más que cualquier aporte económico.
           </p>

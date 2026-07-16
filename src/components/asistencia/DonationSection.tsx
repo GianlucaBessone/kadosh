@@ -7,13 +7,13 @@ export function DonationSection() {
   return (
     <Card className="rounded-3xl border-border/50 shadow-sm overflow-hidden">
       <CardContent className="p-5 flex flex-col gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center justify-center gap-3 text-center">
           <div className="bg-primary/10 p-2 rounded-full text-primary">
             <Heart className="w-5 h-5" />
           </div>
           <h2 className="text-lg font-semibold text-foreground">Apoyar el proyecto</h2>
         </div>
-        <div className="space-y-3 text-sm text-muted-foreground">
+        <div className="space-y-3 text-sm text-muted-foreground text-center">
           <p>KADOSH siempre será una aplicación completamente gratuita.</p>
           <p>
             Nunca bloquearemos funciones mediante suscripciones, publicidad invasiva ni pagos obligatorios.

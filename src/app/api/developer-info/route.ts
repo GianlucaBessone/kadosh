@@ -26,13 +26,21 @@ export async function GET(req: Request) {
       return NextResponse.json({ status: 'IDLE' });
     }
 
-    // Si estaba PENDING pero ya pasó su hora, podríamos pasarlo a NOTIFIED
-    // Aquí el cron de notificaciones idealmente también cambiaría este estado, pero
-    // por ahora lo manejamos cuando el cliente consulta.
+    // Si estaba PENDING pero ya pasó su hora, pasarlo a NOTIFIED
     if (request.status === 'PENDING') {
-      // We don't exactly know when it was scheduled to finish here, 
-      // but usually the client will just get NOTIFIED when the push arrives.
-      // So we just return PENDING.
+      const intent = await prisma.notificationIntent.findFirst({
+        where: { commitmentId: `dev-info-${request.id}` },
+      });
+
+      if (intent && new Date() >= intent.targetTimeUtc) {
+        // Actualizamos el estado a NOTIFIED
+        const updatedRequest = await prisma.developerInfoRequest.update({
+          where: { id: request.id },
+          data: { status: 'NOTIFIED', notifiedAt: new Date() },
+        });
+        
+        return NextResponse.json({ status: updatedRequest.status });
+      }
     }
 
     return NextResponse.json({ status: request.status });
@@ -55,8 +63,8 @@ export async function POST(req: Request) {
     const configMin = await prisma.appConfig.findUnique({ where: { key: 'developer_reveal_min_minutes' } });
     const configMax = await prisma.appConfig.findUnique({ where: { key: 'developer_reveal_max_minutes' } });
 
-    const min = parseInt(configMin?.value || '5');
-    const max = parseInt(configMax?.value || '15');
+    const min = parseInt(configMin?.value || '1'); // Reducido para testing rápido
+    const max = parseInt(configMax?.value || '2');
 
     const minutesToWait = Math.floor(Math.random() * (max - min + 1) + min);
     

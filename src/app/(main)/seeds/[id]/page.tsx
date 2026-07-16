@@ -25,6 +25,8 @@ export default function SeedDetailPage() {
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [waterError, setWaterError] = useState<string | null>(null);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
   const seed = useLiveQuery(() => db.seedGoals.get(id));
 
@@ -61,8 +63,10 @@ export default function SeedDetailPage() {
       await SeedService.waterSeed(seed.id, amount);
       soundService.play('success');
       form.reset();
+      setWaterError(null);
     } else {
       soundService.play('error');
+      setWaterError('Ingresa un monto válido');
     }
   }
 
@@ -77,9 +81,10 @@ export default function SeedDetailPage() {
       await SeedService.withdrawSeed(seed.id, amount);
       soundService.play('success');
       form.reset();
+      setWithdrawError(null);
     } else {
       soundService.play('error');
-      toast.error('Monto inválido o superior al disponible.');
+      setWithdrawError('Monto inválido o insuficiente');
     }
   }
 
@@ -170,50 +175,56 @@ export default function SeedDetailPage() {
                 </TabsList>
                 
                 <TabsContent value="water">
-                  <form onSubmit={handleWater} className="flex flex-col gap-4">
+                  <form onSubmit={handleWater} className="flex flex-col gap-4" noValidate>
                     <h3 className="font-semibold text-foreground flex items-center gap-2">
                       <Droplet className="w-4 h-4 text-primary" /> Regar semilla
                     </h3>
                     
-                    <div className="flex gap-3">
-                      <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">$</div>
-                        <MoneyInput 
-                          name="amount" 
-                          placeholder="0,00" 
-                          required 
-                          baseTextSize="text-base"
-                          className="flex h-12 w-full rounded-2xl border border-input bg-background shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
-                        />
+                    <div>
+                      <div className="flex gap-3">
+                        <div className="relative flex-1">
+                          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">$</div>
+                          <MoneyInput 
+                            name="amount" 
+                            placeholder="0,00" 
+                            required 
+                            baseTextSize="text-base"
+                            className="flex h-12 w-full rounded-2xl border border-input bg-background shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
+                          />
+                        </div>
+                        <Button type="submit" className="h-12 px-6 rounded-2xl shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
+                          Aportar
+                        </Button>
                       </div>
-                      <Button type="submit" className="h-12 px-6 rounded-2xl shadow-sm bg-primary hover:bg-primary/90 text-primary-foreground font-medium">
-                        Aportar
-                      </Button>
+                      {waterError && <p className="text-xs text-destructive mt-1.5 ml-2 text-left">{waterError}</p>}
                     </div>
                     <p className="text-xs text-muted-foreground text-center mt-1">Este monto se deducirá de tu balance principal.</p>
                   </form>
                 </TabsContent>
 
                 <TabsContent value="withdraw">
-                  <form onSubmit={handleWithdraw} className="flex flex-col gap-4">
+                  <form onSubmit={handleWithdraw} className="flex flex-col gap-4" noValidate>
                     <h3 className="font-semibold text-foreground flex items-center gap-2">
                       <Sprout className="w-4 h-4 text-destructive" /> Retirar fondos
                     </h3>
                     
-                    <div className="flex gap-3">
-                      <div className="relative flex-1">
-                        <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">$</div>
-                        <MoneyInput 
-                          name="amount" 
-                          placeholder="0,00" 
-                          required 
-                          baseTextSize="text-base"
-                          className="flex h-12 w-full rounded-2xl border border-input bg-background shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
-                        />
+                    <div>
+                      <div className="flex gap-3">
+                        <div className="relative flex-1">
+                          <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">$</div>
+                          <MoneyInput 
+                            name="amount" 
+                            placeholder="0,00" 
+                            required 
+                            baseTextSize="text-base"
+                            className="flex h-12 w-full rounded-2xl border border-input bg-background shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
+                          />
+                        </div>
+                        <Button type="submit" variant="destructive" className="h-12 px-6 rounded-2xl shadow-sm font-medium">
+                          Retirar
+                        </Button>
                       </div>
-                      <Button type="submit" variant="destructive" className="h-12 px-6 rounded-2xl shadow-sm font-medium">
-                        Retirar
-                      </Button>
+                      {withdrawError && <p className="text-xs text-destructive mt-1.5 ml-2 text-left">{withdrawError}</p>}
                     </div>
                     <p className="text-xs text-muted-foreground text-center mt-1">Este monto volverá a tu balance principal.</p>
                   </form>

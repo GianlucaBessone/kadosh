@@ -5,13 +5,19 @@ export class SyncEngine {
   private isSyncing = false;
   private syncInterval: NodeJS.Timeout | null = null;
 
-  start(intervalMs: number = 30000) {
+  async start(intervalMs: number = 30000) {
     if (typeof window === 'undefined') return;
+
+    const user = await db.users.orderBy('id').first();
+    if (!user || !user.isCloudLinked) {
+      console.log('Sync disabled: no cloud account linked in local DB.');
+      return;
+    }
 
     // Only sync if user has a linked cloud account (Supabase session cookie exists)
     const hasSupabaseSession = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
     if (!hasSupabaseSession) {
-      console.log('Sync disabled: no cloud account linked.');
+      console.log('Sync disabled: no cloud account linked (no cookie).');
       return;
     }
 
@@ -49,7 +55,6 @@ export class SyncEngine {
     try {
       await this.pushChanges();
       await this.pullChanges();
-      soundService.play('success');
     } catch (error: any) {
       if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message === 'Load failed')) {
         console.log('Sync paused: device is offline or server unreachable.');

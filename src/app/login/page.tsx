@@ -205,7 +205,7 @@ export default function LoginPage() {
         </div>
 
         {(authState === 'LOGIN' || authState === 'SETUP_PIN_1' || authState === 'SETUP_PIN_2' || authState === 'REMOVE_USER_PIN') && (
-          <form onSubmit={handlePinSubmit} className="flex flex-col flex-1 pb-safe">
+          <form onSubmit={handlePinSubmit} className="flex flex-col flex-1 pb-safe" noValidate>
             {authState === 'SETUP_PIN_1' && (
               <div className="space-y-2 mb-2 flex gap-2">
                 <Input 
@@ -371,7 +371,7 @@ export default function LoginPage() {
               ¿Deseas sincronizar tus datos en la nube para acceder desde otros dispositivos y tener respaldo automático?
             </p>
             
-            <form action={loginWithGoogle}>
+            <form action={loginWithGoogle} noValidate>
               <Button variant="outline" className="w-full rounded-full h-12 border-border shadow-sm bg-card hover:bg-muted" type="submit">
                 Sincronizar con Google
               </Button>
@@ -386,7 +386,7 @@ export default function LoginPage() {
               </div>
             </div>
 
-            <form action={login} className="flex flex-col gap-4">
+            <form action={login} className="flex flex-col gap-4" noValidate>
               <Input name="email" placeholder="ejemplo@correo.com" type="email" required className="h-12 rounded-2xl bg-card" />
               <Input name="password" placeholder="••••••••" type="password" required className="h-12 rounded-2xl bg-card" />
               <Button className="w-full h-12 rounded-full mt-2 font-medium" type="submit">

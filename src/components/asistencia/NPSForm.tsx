@@ -81,7 +81,7 @@ export function NPSForm({ isOpen, onClose }: NPSFormProps) {
             </Button>
           </div>
         ) : (
-          <form onSubmit={step === 2 ? handleSubmit : (e) => { e.preventDefault(); setStep(2); }} className="space-y-4">
+          <form onSubmit={step === 2 ? handleSubmit : (e) => { e.preventDefault(); setStep(2); }} className="space-y-4" noValidate>
             <DialogHeader>
               <DialogTitle>Calificar experiencia</DialogTitle>
               {step === 1 ? (

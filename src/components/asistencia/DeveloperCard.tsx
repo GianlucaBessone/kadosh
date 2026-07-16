@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, MessageCircle, Phone, Loader2, Info } from 'lucide-react';
+import { Mail, MessageCircle, Phone, Loader2, Info, Handshake } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -10,6 +10,12 @@ export function DeveloperCard() {
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<'IDLE' | 'PENDING' | 'NOTIFIED' | 'SEEN'>('IDLE');
   const user = useLiveQuery(() => db.users.orderBy('id').first());
+
+  useEffect(() => {
+    const onSeen = () => setStatus('SEEN');
+    window.addEventListener('dev-info-seen', onSeen);
+    return () => window.removeEventListener('dev-info-seen', onSeen);
+  }, []);
 
   useEffect(() => {
     if (!user) return;
@@ -31,6 +37,27 @@ export function DeveloperCard() {
     checkStatus();
   }, [user]);
 
+  // Poll for status updates if PENDING
+  useEffect(() => {
+    if (status !== 'PENDING' || !user) return;
+    
+    const interval = setInterval(async () => {
+      try {
+        const response = await fetch(`/api/developer-info?userId=${user.isCloudLinked ? user.id : ''}&guestId=${!user.isCloudLinked ? user.id : ''}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.status && data.status !== 'PENDING') {
+            setStatus(data.status);
+          }
+        }
+      } catch (error) {
+        console.error('Error polling developer info status', error);
+      }
+    }, 15000); // Poll every 15 seconds
+
+    return () => clearInterval(interval);
+  }, [status, user]);
+
   const handleRequest = async () => {
     if (!user) return;
     setLoading(true);
@@ -47,7 +74,8 @@ export function DeveloperCard() {
       if (!response.ok) throw new Error('Error al solicitar información');
 
       setStatus('PENDING');
-      toast.success('Solicitud enviada. Te notificaremos cuando la información esté disponible.');
+      window.dispatchEvent(new Event('dev-info-requested'));
+      toast.success('Solicitud enviada. Te notificaremos cuando la información esté disponible.', { duration: 2500 });
     } catch {
       toast.error('Ocurrió un error. Intenta nuevamente.');
     } finally {
@@ -79,7 +107,7 @@ export function DeveloperCard() {
 
   if (status === 'IDLE') {
     return (
-      <div className="mt-4 p-4 bg-muted/40 rounded-2xl flex flex-col gap-3">
+      <div className="mt-4 p-4 bg-muted/40 rounded-2xl flex flex-col gap-3 text-center">
         <p className="text-sm text-foreground font-medium">
           Aunque no buscamos reconocimiento personal, entendemos que algunas personas desean conocer quién desarrolla esta aplicación.
         </p>
@@ -120,10 +148,12 @@ export function DeveloperCard() {
   if (status === 'SEEN') {
     const userName = user?.name || 'amigo';
     return (
-      <Card className="mt-4 bg-card border-primary/30 shadow-md animate-in fade-in zoom-in-95 duration-500 overflow-hidden">
+      <Card id="developer-card" className="mt-4 bg-card border-primary/30 shadow-md animate-in fade-in zoom-in-95 duration-500 overflow-hidden">
         <CardContent className="p-0">
-          <div className="bg-primary/5 p-5 flex flex-col gap-4">
-            <h3 className="text-xl font-bold text-foreground">Mucho gusto 👋</h3>
+          <div className="bg-primary/5 p-5 flex flex-col gap-4 text-center">
+            <h3 className="text-xl font-bold text-foreground flex items-center justify-center gap-2">
+              Mucho gusto <Handshake className="w-5 h-5 text-primary" />
+            </h3>
             <div className="space-y-3 text-sm text-foreground">
               <p>Hola {userName}.</p>
               <p>Mi nombre es <strong>Gianluca Bessone</strong>.</p>

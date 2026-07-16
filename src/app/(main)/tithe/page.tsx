@@ -14,12 +14,15 @@ import { formatMoney } from '@/lib/utils'
 import { MoneyInput } from '@/components/ui/MoneyInput'
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
 import { MotivationalVerseService } from '@/services/motivationalVerseService'
+import { soundService } from '@/lib/SoundService'
+import { toast } from 'sonner'
 
 export default function TithePage() {
   const [loading, setLoading] = useState(false);
   const [customPercentage, setCustomPercentage] = useState<number | null>(null);
   const [customFixedAmount, setCustomFixedAmount] = useState<number | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
   const [tempPct, setTempPct] = useState<string>('10');
   const [tempAmt, setTempAmt] = useState<string>('');
   const [isFlipped, setIsFlipped] = useState(false);
@@ -120,7 +123,14 @@ export default function TithePage() {
       const amount = typeof amountStr === 'string' ? parseFloat(amountStr) : NaN;
       const notes = typeof notesStr === 'string' ? notesStr : null;
 
-      if (isNaN(amount) || amount <= 0 || !user) return;
+      if (isNaN(amount) || amount <= 0) {
+        soundService.play('error');
+        setFormError('Ingresa un monto válido');
+        setLoading(false);
+        return;
+      }
+      setFormError(null);
+      if (!user) return;
 
       await TitheService.createTithe({
         userId: user.id,
@@ -157,22 +167,16 @@ export default function TithePage() {
       </div>
 
       <div style={{ perspective: '1000px' }} className="w-full relative z-0">
-        <div
-          style={{
-            transformStyle: 'preserve-3d',
-            transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
-          }}
-          className="relative w-full transition-transform duration-700 ease-in-out"
-        >
+        <div className="relative w-full">
           {/* FRONT SIDE */}
           <Card 
             style={{ 
               backfaceVisibility: 'hidden', 
               WebkitBackfaceVisibility: 'hidden',
               pointerEvents: isFlipped ? 'none' : 'auto',
-              transform: 'translateZ(0)'
+              transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)'
             }}
-            className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm relative overflow-hidden w-full pb-2"
+            className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm relative overflow-hidden w-full pb-2 transition-transform duration-700 ease-in-out"
           >
             <div className="absolute -right-8 -top-8 text-gold/10">
               <HandHeart className="w-48 h-48" />
@@ -270,10 +274,10 @@ export default function TithePage() {
             style={{ 
               backfaceVisibility: 'hidden', 
               WebkitBackfaceVisibility: 'hidden',
-              transform: 'rotateY(180deg)',
+              transform: isFlipped ? 'rotateY(0deg)' : 'rotateY(-180deg)',
               pointerEvents: isFlipped ? 'auto' : 'none'
             }}
-            className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm absolute inset-0 overflow-hidden w-full h-full flex flex-col items-center justify-center p-6"
+            className="rounded-3xl border-gold/20 bg-gold/5 shadow-sm absolute inset-0 overflow-hidden w-full h-full flex flex-col items-center justify-center p-6 transition-transform duration-700 ease-in-out"
           >
             <div className="absolute -left-8 -top-8 text-gold/10">
               <HandHeart className="w-48 h-48" />
@@ -298,20 +302,23 @@ export default function TithePage() {
       </div>
 
       {/* Formulario de registro */}
-      <form onSubmit={handleRegister} className="flex flex-col gap-4">
-        <div className="flex gap-3">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">
-              $
+      <form onSubmit={handleRegister} className="flex flex-col gap-4" noValidate>
+        <div>
+          <div className="flex gap-3">
+            <div className="relative flex-1">
+              <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-muted-foreground z-10">
+                $
+              </div>
+              <MoneyInput 
+                name="amount" 
+                placeholder="0,00" 
+                required 
+                baseTextSize="text-base"
+                className="flex h-12 w-full rounded-2xl border border-input bg-card shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
+              />
             </div>
-            <MoneyInput 
-              name="amount" 
-              placeholder="0,00" 
-              required 
-              baseTextSize="text-base"
-              className="flex h-12 w-full rounded-2xl border border-input bg-card shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-medium text-left"
-            />
           </div>
+          {formError && <p className="text-xs text-destructive mt-1.5 ml-2">{formError}</p>}
         </div>
         <Input 
           name="notes" 

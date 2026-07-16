@@ -122,25 +122,41 @@ export function CommitmentCard({
     }
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, a')) {
+      return;
+    }
+    setShowOptions(v => !v);
+  };
+
   return (
     <>
       {showSuccess && <PaymentSuccessAnimation />}
 
       <div
+        onClick={handleCardClick}
         className={cn(
-          'relative bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden transition-all duration-200',
+          'relative bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden transition-all duration-200 cursor-pointer hover:shadow-md hover:border-border/80',
           isCompleted && 'opacity-60',
           isPaused && 'border-dashed'
         )}
       >
         {/* Urgency / overdue indicator */}
         {(isUrgent || isOverdue) && !isCompleted && (
-          <div
-            className={cn(
-              'absolute top-0 left-0 right-0 h-0.5',
-              isOverdue ? 'bg-destructive' : 'bg-gold'
-            )}
-          />
+          <>
+            <div
+              className={cn(
+                'absolute -top-4 left-0 right-0 h-8 opacity-20 blur-xl',
+                isOverdue ? 'bg-destructive' : 'bg-gold'
+              )}
+            />
+            <div
+              className={cn(
+                'absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r',
+                isOverdue ? 'from-transparent via-destructive to-transparent' : 'from-transparent via-gold to-transparent'
+              )}
+            />
+          </>
         )}
 
         <div className="p-5">
@@ -160,14 +176,6 @@ export function CommitmentCard({
               </div>
             </div>
 
-            {/* More options button */}
-            <button
-              onClick={() => setShowOptions(v => !v)}
-              className="flex-none p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              aria-label="Más opciones"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Description & Notes */}

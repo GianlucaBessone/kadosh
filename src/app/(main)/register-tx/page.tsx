@@ -23,6 +23,7 @@ export default function RegisterTransactionPage() {
   const [isMounted, setIsMounted] = useState(false);
   const [showMotivationalModal, setShowMotivationalModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [formErrors, setFormErrors] = useState<{ amount?: string; category?: string; date?: string; }>({});
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -45,12 +46,31 @@ export default function RegisterTransactionPage() {
       const notes = formData.get('notes')?.toString() || null;
 
       const amount = parseFloat(amountStr);
+      let hasError = false;
+      const newErrors: { amount?: string; category?: string; date?: string; } = {};
+
       if (isNaN(amount) || amount <= 0) {
+        newErrors.amount = 'Ingresa un monto válido.';
+        hasError = true;
+      }
+
+      if (!categoryId) {
+        newErrors.category = 'Selecciona categoría.';
+        hasError = true;
+      }
+
+      if (!dateStr) {
+        newErrors.date = 'Selecciona una fecha.';
+        hasError = true;
+      }
+
+      if (hasError) {
         soundService.play('error');
-        setError('El monto ingresado es inválido o debe ser mayor a 0.');
+        setFormErrors(newErrors);
         setLoading(false);
         return;
       }
+      setFormErrors({});
 
       // Get first account
       let account = await db.accounts.orderBy('id').first();
@@ -116,7 +136,7 @@ export default function RegisterTransactionPage() {
   if (!isMounted) return null;
 
   return (
-    <div className="flex flex-col min-h-screen bg-background animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
+    <div className="flex flex-col bg-background animate-in fade-in slide-in-from-bottom-4 duration-500 pb-8">
       
       <div className="flex items-center gap-4 mb-2">
         <Link href="/home" className="text-muted-foreground hover:text-foreground transition-colors p-2 -ml-2">
@@ -140,7 +160,7 @@ export default function RegisterTransactionPage() {
 
         {/* GASTO */}
         <TabsContent value="expense" className="mt-6 space-y-6">
-          <form className="flex flex-col gap-6" onSubmit={(e) => handleSubmit(e, 'EXPENSE')}>
+          <form className="flex flex-col gap-6" noValidate onSubmit={(e) => handleSubmit(e, 'EXPENSE')}>
             
             {/* Monto Grande */}
             <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm px-4">
@@ -155,6 +175,7 @@ export default function RegisterTransactionPage() {
                   baseTextSize="text-4xl"
                 />
               </div>
+              {formErrors.amount && <p className="text-xs text-destructive mt-3 text-center w-full">{formErrors.amount}</p>}
             </div>
 
             <div className="space-y-2">
@@ -176,6 +197,7 @@ export default function RegisterTransactionPage() {
                   <SelectItem value="other"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-muted-foreground" /> Otros</div></SelectItem>
                 </SelectContent>
               </Select>
+              {formErrors.category && <p className="text-xs text-destructive ml-2">{formErrors.category}</p>}
             </div>
 
             <div className="space-y-2">
@@ -188,6 +210,7 @@ export default function RegisterTransactionPage() {
                 defaultValue={new Date().toISOString().split('T')[0]}
                 className="h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary"
               />
+              {formErrors.date && <p className="text-xs text-destructive ml-2">{formErrors.date}</p>}
             </div>
 
             <div className="space-y-2">
@@ -208,7 +231,7 @@ export default function RegisterTransactionPage() {
 
         {/* INGRESO */}
         <TabsContent value="income" className="mt-6 space-y-6">
-          <form className="flex flex-col gap-6" onSubmit={(e) => handleSubmit(e, 'INCOME')}>
+          <form className="flex flex-col gap-6" noValidate onSubmit={(e) => handleSubmit(e, 'INCOME')}>
             <div className="flex flex-col items-center justify-center py-6 bg-card rounded-3xl border border-border/50 shadow-sm px-4">
               <span className="text-sm text-muted-foreground uppercase font-medium tracking-wider mb-2">Monto</span>
               <div className="flex items-center text-4xl font-bold text-success w-full justify-center">
@@ -220,6 +243,7 @@ export default function RegisterTransactionPage() {
                   baseTextSize="text-4xl"
                 />
               </div>
+              {formErrors.amount && <p className="text-xs text-destructive mt-3 text-center w-full">{formErrors.amount}</p>}
             </div>
 
             <div className="space-y-2">
@@ -237,6 +261,7 @@ export default function RegisterTransactionPage() {
                   <SelectItem value="other"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-muted-foreground" /> Otros</div></SelectItem>
                 </SelectContent>
               </Select>
+              {formErrors.category && <p className="text-xs text-destructive ml-2">{formErrors.category}</p>}
             </div>
 
             <div className="space-y-2">
@@ -249,6 +274,7 @@ export default function RegisterTransactionPage() {
                 defaultValue={new Date().toISOString().split('T')[0]}
                 className="h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary"
               />
+              {formErrors.date && <p className="text-xs text-destructive ml-2">{formErrors.date}</p>}
             </div>
 
             <div className="space-y-2">

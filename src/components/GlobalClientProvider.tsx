@@ -12,12 +12,13 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { soundService } from '@/lib/SoundService';
 import { Toaster } from '@/components/ui/sonner';
+import { GlobalDevInfoWatcher } from '@/components/GlobalDevInfoWatcher';
 
 const PUBLIC_ROUTES = new Set(['/', '/login', '/registro', '/welcome']);
 
 function isPublicPath(pathname: string | null) {
   if (!pathname) return false;
-  return PUBLIC_ROUTES.has(pathname);
+  return PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/admin');
 }
 
 /**
@@ -99,6 +100,7 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
   return (
     <TooltipProvider>
       <ThemeApplier />
+      <GlobalDevInfoWatcher />
       {pathname !== '/welcome' && <OnboardingModal />}
       {children}
       <Toaster />

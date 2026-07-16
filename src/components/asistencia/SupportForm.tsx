@@ -91,7 +91,7 @@ export function SupportForm({ isOpen, onClose, defaultType }: SupportFormProps) 
             </Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <DialogHeader>
               <DialogTitle>Obtener ayuda</DialogTitle>
               <DialogDescription>

@@ -229,7 +229,7 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
   // Field, inputClass and selectClass are defined at module level above.
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-6 pb-10">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6 pb-10" noValidate>
       {/* Nombre */}
       <Field label="Nombre" error={errors.name}>
         <input
