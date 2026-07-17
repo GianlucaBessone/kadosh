@@ -57,12 +57,12 @@ export const COMMITMENT_TYPE_LABELS: Record<import('@/lib/db').CommitmentType, s
 export const PERIODICITY_LABELS: Record<import('@/lib/db').CommitmentPeriodicity, string> = {
   DAILY: 'Diario',
   WEEKLY: 'Semanal',
+  BIWEEKLY: 'Quincenal',
   MONTHLY: 'Mensual',
   BIMONTHLY: 'Bimestral',
   QUARTERLY: 'Trimestral',
   SEMIANNUAL: 'Semestral',
   YEARLY: 'Anual',
-  BIWEEKLY: 'Quincenal',
   CUSTOM: 'Personalizado',
 };
 

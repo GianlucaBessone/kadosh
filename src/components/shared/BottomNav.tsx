@@ -60,7 +60,7 @@ export function BottomNav() {
 
   return (
     <>
-      <nav className="fixed bottom-0 left-0 right-0 z-50 flex h-20 items-center justify-between bg-card px-6 pb-safe pt-2 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.05)] rounded-t-3xl border-t border-border/40">
+      <nav className="fixed bottom-0 left-0 right-0 z-50 flex min-h-[5rem] items-center justify-between bg-card px-6 pb-[env(safe-area-inset-bottom)] pt-2 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.05)] rounded-t-3xl border-t border-border/40">
         {navItems.map((item) => {
           const Icon = item.icon
 

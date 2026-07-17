@@ -11,7 +11,7 @@ export function MoneyDisplay({ amount, className, hideSymbol = false, compact = 
   let formatted = '';
   let isCompactM = false;
 
-  if (compact && Math.abs(amount) >= 1_000_000) {
+  if (compact && Math.abs(amount) >= 100_000_000) {
     const millions = amount / 1_000_000;
     formatted = millions.toLocaleString('es-AR', {
       minimumFractionDigits: 0,

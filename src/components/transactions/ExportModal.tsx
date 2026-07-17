@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { X, FileSpreadsheet, FileText, CalendarDays, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { DatePicker } from '@/components/ui/picker/date/DatePicker';
+import { format } from 'date-fns';
 import { db } from '@/lib/db';
 import { formatMoney } from '@/lib/utils';
 import * as XLSX from 'xlsx';
@@ -464,19 +466,17 @@ export function ExportModal({ onClose }: ExportModalProps) {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Desde</label>
-                    <Input 
-                      type="date" 
-                      value={advFilters.dateFrom} 
-                      onChange={e => setAdvFilters(p => ({ ...p, dateFrom: e.target.value }))}
+                    <DatePicker 
+                      value={advFilters.dateFrom ? new Date(advFilters.dateFrom + "T00:00:00") : undefined} 
+                      onChange={d => setAdvFilters(p => ({ ...p, dateFrom: d ? format(d, 'yyyy-MM-dd') : '' }))}
                       className="h-12 rounded-xl"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Hasta</label>
-                    <Input 
-                      type="date" 
-                      value={advFilters.dateTo} 
-                      onChange={e => setAdvFilters(p => ({ ...p, dateTo: e.target.value }))}
+                    <DatePicker 
+                      value={advFilters.dateTo ? new Date(advFilters.dateTo + "T00:00:00") : undefined} 
+                      onChange={d => setAdvFilters(p => ({ ...p, dateTo: d ? format(d, 'yyyy-MM-dd') : '' }))}
                       className="h-12 rounded-xl"
                     />
                   </div>

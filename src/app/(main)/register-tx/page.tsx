@@ -2,7 +2,6 @@
 
 import { Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
@@ -17,6 +16,8 @@ import { MoneyInput } from '@/components/ui/MoneyInput';
 import { MotivationalModal } from '@/components/transactions/MotivationalModal';
 import { soundService } from '@/lib/SoundService';
 import { toast } from 'sonner';
+import { SelectPicker } from '@/components/ui/picker/select/SelectPicker';
+import { DatePicker } from '@/components/ui/picker/date/DatePicker';
 
 function RegisterTxContent() {
   const router = useRouter();
@@ -27,6 +28,11 @@ function RegisterTxContent() {
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{ amount?: string; category?: string; date?: string; }>({});
   const workspaceId = WorkspaceQueries.useActiveWorkspaceId();
+
+  const [expenseDate, setExpenseDate] = useState<Date | undefined>(new Date());
+  const [expenseCategory, setExpenseCategory] = useState<string>('');
+  const [incomeDate, setIncomeDate] = useState<Date | undefined>(new Date());
+  const [incomeCategory, setIncomeCategory] = useState<string>('');
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -182,34 +188,34 @@ function RegisterTxContent() {
 
             <div className="space-y-2">
               <Label htmlFor="category" className="text-xs text-muted-foreground ml-2">Categoría</Label>
-              <Select name="category" required>
-                <SelectTrigger id="category" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary focus:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary text-base">
-                  <SelectValue placeholder="Selecciona una categoría..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="supermarket"><div className="flex items-center gap-2"><ShoppingCart className="w-4 h-4 text-muted-foreground" /> Supermercado</div></SelectItem>
-                  <SelectItem value="housing"><div className="flex items-center gap-2"><Home className="w-4 h-4 text-muted-foreground" /> Hogar</div></SelectItem>
-                  <SelectItem value="transport"><div className="flex items-center gap-2"><Car className="w-4 h-4 text-muted-foreground" /> Transporte</div></SelectItem>
-                  <SelectItem value="food"><div className="flex items-center gap-2"><Utensils className="w-4 h-4 text-muted-foreground" /> Comida / Restaurantes</div></SelectItem>
-                  <SelectItem value="health"><div className="flex items-center gap-2"><Pill className="w-4 h-4 text-muted-foreground" /> Salud</div></SelectItem>
-                  <SelectItem value="education"><div className="flex items-center gap-2"><BookOpen className="w-4 h-4 text-muted-foreground" /> Educación</div></SelectItem>
-                  <SelectItem value="entertainment"><div className="flex items-center gap-2"><Film className="w-4 h-4 text-muted-foreground" /> Entretenimiento</div></SelectItem>
-                  <SelectItem value="services"><div className="flex items-center gap-2"><Lightbulb className="w-4 h-4 text-muted-foreground" /> Servicios</div></SelectItem>
-                  <SelectItem value="clothing"><div className="flex items-center gap-2"><Shirt className="w-4 h-4 text-muted-foreground" /> Ropa</div></SelectItem>
-                  <SelectItem value="other"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-muted-foreground" /> Otros</div></SelectItem>
-                </SelectContent>
-              </Select>
+              <SelectPicker
+                name="category"
+                value={expenseCategory}
+                onChange={setExpenseCategory}
+                placeholder="Selecciona una categoría..."
+                className="h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary text-base"
+                items={[
+                  { value: "supermarket", label: "Supermercado", icon: <ShoppingCart className="w-4 h-4" /> },
+                  { value: "housing", label: "Hogar", icon: <Home className="w-4 h-4" /> },
+                  { value: "transport", label: "Transporte", icon: <Car className="w-4 h-4" /> },
+                  { value: "food", label: "Comida / Restaurantes", icon: <Utensils className="w-4 h-4" /> },
+                  { value: "health", label: "Salud", icon: <Pill className="w-4 h-4" /> },
+                  { value: "education", label: "Educación", icon: <BookOpen className="w-4 h-4" /> },
+                  { value: "entertainment", label: "Entretenimiento", icon: <Film className="w-4 h-4" /> },
+                  { value: "services", label: "Servicios", icon: <Lightbulb className="w-4 h-4" /> },
+                  { value: "clothing", label: "Ropa", icon: <Shirt className="w-4 h-4" /> },
+                  { value: "other", label: "Otros", icon: <Package className="w-4 h-4" /> },
+                ]}
+              />
               {formErrors.category && <p className="text-xs text-destructive ml-2">{formErrors.category}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="date" className="text-xs text-muted-foreground ml-2">Fecha</Label>
-              <Input 
-                id="date" 
+              <DatePicker
                 name="date"
-                type="date" 
-                required
-                defaultValue={new Date().toISOString().split('T')[0]}
+                value={expenseDate}
+                onChange={setExpenseDate}
                 className="h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary"
               />
               {formErrors.date && <p className="text-xs text-destructive ml-2">{formErrors.date}</p>}
@@ -251,30 +257,30 @@ function RegisterTxContent() {
 
             <div className="space-y-2">
               <Label htmlFor="category-income" className="text-xs text-muted-foreground ml-2">Categoría</Label>
-              <Select name="category" required>
-                <SelectTrigger id="category-income" className="w-full h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus:ring-primary focus:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary text-base">
-                  <SelectValue placeholder="Selecciona una categoría..." />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="salary"><div className="flex items-center gap-2"><Briefcase className="w-4 h-4 text-muted-foreground" /> Salario</div></SelectItem>
-                  <SelectItem value="freelance"><div className="flex items-center gap-2"><Laptop className="w-4 h-4 text-muted-foreground" /> Freelance</div></SelectItem>
-                  <SelectItem value="gifts"><div className="flex items-center gap-2"><Gift className="w-4 h-4 text-muted-foreground" /> Regalos</div></SelectItem>
-                  <SelectItem value="investments"><div className="flex items-center gap-2"><TrendingUp className="w-4 h-4 text-muted-foreground" /> Inversiones</div></SelectItem>
-                  <SelectItem value="business"><div className="flex items-center gap-2"><Building2 className="w-4 h-4 text-muted-foreground" /> Negocio</div></SelectItem>
-                  <SelectItem value="other"><div className="flex items-center gap-2"><Package className="w-4 h-4 text-muted-foreground" /> Otros</div></SelectItem>
-                </SelectContent>
-              </Select>
+              <SelectPicker
+                name="category"
+                value={incomeCategory}
+                onChange={setIncomeCategory}
+                placeholder="Selecciona una categoría..."
+                className="h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary text-base"
+                items={[
+                  { value: "salary", label: "Salario", icon: <Briefcase className="w-4 h-4" /> },
+                  { value: "freelance", label: "Freelance", icon: <Laptop className="w-4 h-4" /> },
+                  { value: "gifts", label: "Regalos", icon: <Gift className="w-4 h-4" /> },
+                  { value: "investments", label: "Inversiones", icon: <TrendingUp className="w-4 h-4" /> },
+                  { value: "business", label: "Negocio", icon: <Building2 className="w-4 h-4" /> },
+                  { value: "other", label: "Otros", icon: <Package className="w-4 h-4" /> },
+                ]}
+              />
               {formErrors.category && <p className="text-xs text-destructive ml-2">{formErrors.category}</p>}
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="date-income" className="text-xs text-muted-foreground ml-2">Fecha</Label>
-              <Input 
-                id="date-income" 
+              <DatePicker
                 name="date"
-                type="date" 
-                required
-                defaultValue={new Date().toISOString().split('T')[0]}
+                value={incomeDate}
+                onChange={setIncomeDate}
                 className="h-12 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary"
               />
               {formErrors.date && <p className="text-xs text-destructive ml-2">{formErrors.date}</p>}
