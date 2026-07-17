@@ -3,6 +3,7 @@
 import { ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +12,11 @@ import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { SeedService } from '@/services/seedService'
 import { db } from '@/lib/db'
 import { soundService } from '@/lib/SoundService'
+import { toast } from 'sonner'
 
 export default function NewSeedPage() {
   const router = useRouter();
+  const [formErrors, setFormErrors] = useState<{name?: string, amount?: string}>({});
 
   const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -24,6 +27,26 @@ export default function NewSeedPage() {
     const name = typeof nameStr === 'string' ? nameStr : '';
     const targetAmount = typeof targetAmountStr === 'string' ? parseFloat(targetAmountStr) : NaN;
     
+    let hasError = false;
+    const newErrors: {name?: string, amount?: string} = {};
+
+    if (!name) {
+      newErrors.name = 'Ingresa el propósito';
+      hasError = true;
+    }
+
+    if (isNaN(targetAmount) || targetAmount <= 0) {
+      newErrors.amount = 'Ingresa una meta válida';
+      hasError = true;
+    }
+
+    if (hasError) {
+      soundService.play('error');
+      setFormErrors(newErrors);
+      return;
+    }
+    setFormErrors({});
+
     if (name && targetAmount > 0) {
       const user = await db.users.orderBy('id').first();
       if (!user) return;
@@ -32,9 +55,6 @@ export default function NewSeedPage() {
         userId: user.id,
         name,
         targetAmount,
-        currentAmount: 0,
-        status: 'ACTIVE',
-        targetDate: null
       });
       
       soundService.play('success');
@@ -59,7 +79,7 @@ export default function NewSeedPage() {
         </div>
       </div>
 
-      <form onSubmit={handleCreate} className="flex flex-col gap-6">
+      <form onSubmit={handleCreate} className="flex flex-col gap-6" noValidate>
         
         <div className="space-y-2">
           <Label htmlFor="name" className="text-xs text-muted-foreground ml-2">¿Qué propósito tiene esta semilla?</Label>
@@ -70,6 +90,7 @@ export default function NewSeedPage() {
             required 
             className="h-14 rounded-2xl bg-card border-border shadow-sm px-4 focus-visible:ring-primary text-base"
           />
+          {formErrors.name && <p className="text-xs text-destructive ml-2">{formErrors.name}</p>}
         </div>
 
         <div className="space-y-2">
@@ -86,6 +107,7 @@ export default function NewSeedPage() {
               className="flex h-14 w-full rounded-2xl border border-input bg-card shadow-sm px-3 py-1 transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary pl-8 pr-4 font-semibold text-left text-base"
             />
           </div>
+          {formErrors.amount && <p className="text-xs text-destructive ml-2">{formErrors.amount}</p>}
         </div>
 
         <Button className="w-full h-14 rounded-full mt-4 shadow-md font-medium text-lg bg-primary hover:bg-primary/90 text-primary-foreground">

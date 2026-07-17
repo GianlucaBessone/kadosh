@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { CommitmentForm } from '@/features/planning/components/CommitmentForm';
 
@@ -14,8 +13,6 @@ export default function NewCommitmentPage() {
     setIsMounted(true);
   }, []);
   const router = useRouter();
-  const user = useLiveQuery(() => db.users.orderBy('id').first());
-  const ownerId = user?.id ?? '';
 
   if (!isMounted) return null;
 
@@ -36,13 +33,7 @@ export default function NewCommitmentPage() {
         </div>
       </div>
 
-      {ownerId ? (
-        <CommitmentForm ownerId={ownerId} />
-      ) : (
-        <div className="flex items-center justify-center py-20 text-muted-foreground text-sm">
-          Cargando...
-        </div>
-      )}
+      <CommitmentForm />
     </div>
   );
 }

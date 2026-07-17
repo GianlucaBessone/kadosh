@@ -16,12 +16,13 @@ interface PaymentHistorySheetProps {
 export function PaymentHistorySheet({ commitment, payments, onClose }: PaymentHistorySheetProps) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const isRecurring = commitment.isRecurring ?? (commitment.type === 'SUBSCRIPTION' || commitment.type === 'SERVICE' || !commitment.installments);
   const totalInstallments = commitment.installments ?? '∞';
+  const currentInstallment = commitment.currentInstallment ?? payments.length;
   const paidSet = new Set(payments.map(p => p.installmentNumber));
 
   // Build a full list of installment slots
-  const slots =
-    commitment.isRecurring
+  const slots = isRecurring
       ? payments.map((_, i) => i + 1)
       : Array.from({ length: commitment.installments ?? 0 }, (_, i) => i + 1);
 
@@ -57,9 +58,9 @@ export function PaymentHistorySheet({ commitment, payments, onClose }: PaymentHi
         <div className="px-5 py-4 border-b border-border/40">
           <h3 className="text-lg font-semibold text-foreground">{commitment.name}</h3>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {commitment.isRecurring
+            {isRecurring
               ? `${payments.length} pagos registrados`
-              : `${commitment.currentInstallment} de ${totalInstallments} cuotas pagadas`}
+              : `${currentInstallment} de ${totalInstallments} cuotas pagadas`}
           </p>
         </div>
 

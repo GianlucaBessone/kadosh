@@ -10,6 +10,7 @@ import { formatMoney } from '@/lib/utils';
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { COMMITMENT_TYPE_LABELS, PERIODICITY_LABELS, STATUS_LABELS } from '@/features/planning/types';
 import { formatFullDate } from '@/features/planning/utils/dateUtils';
+import { calcRemainingAmount } from '@/features/planning/utils/amountUtils';
 import Link from 'next/link';
 import { soundService } from '@/lib/SoundService';
 import { toast } from 'sonner';
@@ -168,14 +169,18 @@ export default function CommitmentDetailPage() {
             <div className="flex justify-between text-xs text-muted-foreground mb-1.5">
               <span>Cuota {commitment.currentInstallment} de {commitment.installments}</span>
               {commitment.remainingAmount !== null && (
-                <span className="flex items-center gap-1">Resta <MoneyDisplay amount={commitment.remainingAmount} /></span>
+                <span className="flex items-center gap-1">Resta <MoneyDisplay amount={
+                  commitment.amountTotal && commitment.installmentAmount
+                    ? calcRemainingAmount(commitment.amountTotal, commitment.currentInstallment || 0, commitment.installmentAmount)
+                    : (commitment.remainingAmount || 0)
+                } /></span>
               )}
             </div>
             <div className="h-2 bg-muted rounded-full overflow-hidden">
               <div
                 className="h-full bg-primary rounded-full transition-all duration-700"
                 style={{
-                  width: `${Math.min(100, (commitment.currentInstallment / commitment.installments) * 100)}%`,
+                  width: `${Math.min(100, ((commitment.currentInstallment || 0) / commitment.installments) * 100)}%`,
                 }}
               />
             </div>

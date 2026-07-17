@@ -5,7 +5,6 @@ import { ArrowLeft } from 'lucide-react';
 import { useRouter, useParams } from 'next/navigation';
 import { useCommitment } from '@/features/planning/hooks/usePlanningData';
 import { CommitmentForm } from '@/features/planning/components/CommitmentForm';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 
 export default function EditCommitmentPage() {
@@ -19,8 +18,6 @@ export default function EditCommitmentPage() {
   const id = params?.id || '';
 
   const commitment = useCommitment(id);
-  const user = useLiveQuery(() => db.users.orderBy('id').first());
-  const ownerId = user?.id ?? '';
 
   if (!isMounted) return null;
 
@@ -48,7 +45,7 @@ export default function EditCommitmentPage() {
         </div>
       </div>
 
-      <CommitmentForm ownerId={ownerId} initial={commitment} />
+      <CommitmentForm initial={commitment} />
     </div>
   );
 }

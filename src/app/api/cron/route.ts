@@ -32,6 +32,7 @@ export async function GET(req: Request) {
       userHash: n.userHash,
       title: n.title,
       message: n.message,
+      commitmentId: n.commitmentId,
     }));
 
     const onesignalAppId = process.env.NEXT_PUBLIC_ONESIGNAL_APP_ID;
@@ -59,7 +60,8 @@ export async function GET(req: Request) {
           },
           target_channel: "push",
           headings: { "en": msg.title, "es": msg.title },
-          contents: { "en": msg.message, "es": msg.message }
+          contents: { "en": msg.message, "es": msg.message },
+          ...(msg.commitmentId?.startsWith('dev-info-') && { app_url: '/asistencia' })
         })
       });
 

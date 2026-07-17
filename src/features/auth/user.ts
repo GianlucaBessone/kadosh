@@ -30,15 +30,6 @@ export async function getAuthUser() {
         lastName: user.user_metadata?.lastName || null,
       }
     })
-    
-    // Create default account
-    await prisma.account.create({
-      data: {
-        userId: user.id,
-        name: 'Cuenta Principal',
-        balance: 0,
-      }
-    })
   }
 
   return prismaUser

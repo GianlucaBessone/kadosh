@@ -47,9 +47,9 @@ const benefits = [
     text: 'Calcula diezmos, ofrendas y compromisos para separar cada recurso con intención.',
   },
   {
-    icon: WifiOff,
-    title: 'Funciona offline',
-    text: 'Tus datos viven primero en tu dispositivo. Puedes usar KADOSH aunque no tengas conexión.',
+    icon: LockKeyhole,
+    title: 'Cifrado de grado militar',
+    text: 'Utilizamos estándares criptográficos internacionales para proteger tu gestión financiera. Solo tú tienes la llave de tu información.',
   },
   {
     icon: ShieldCheck,
@@ -250,8 +250,8 @@ export function LandingPage() {
                 Administra con sabiduría. Vive con paz.
               </h1>
               <p className="mt-6 max-w-xl text-lg leading-8 text-foreground/75">
-                KADOSH es una app de finanzas personales inspirada en principios bíblicos: registra movimientos,
-                separa compromisos, cuida tus semillas y protege tus datos desde tu propio dispositivo.
+                KADOSH es una app de gestión de finanzas personales inspirada en principios bíblicos: registra movimientos,
+                separa compromisos y cuida tus semillas en un entorno 100% privado y cifrado.
               </p>
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
                 <Link href="/registro" className="inline-flex h-13 items-center justify-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-xl shadow-primary/25 transition-transform active:scale-95">
@@ -343,10 +343,9 @@ export function LandingPage() {
               transition={{ duration: 0.55 }}
             >
               <p className="mb-3 text-xs font-bold uppercase text-primary">Datos y privacidad</p>
-              <h2 className="text-3xl font-bold leading-tight text-foreground sm:text-4xl">Tus datos empiezan bajo tu control</h2>
+              <h2 className="text-3xl font-bold leading-tight text-foreground sm:text-4xl">Eres el único dueño de tu información</h2>
               <p className="mt-5 text-base leading-7 text-muted-foreground">
-                KADOSH prioriza el almacenamiento local y permite usar la app sin cuenta en la nube. Cuando decides sincronizar,
-                el objetivo es tener respaldo y continuidad entre dispositivos, sin obligarte a entregar más información de la necesaria.
+                KADOSH está construida bajo una arquitectura de conocimiento cero. Tus datos se protegen con cifrado de extremo a extremo. No necesitas entender de criptografía; solo necesitas saber que tus finanzas permanecen estrictamente privadas.
               </p>
             </motion.div>
             <motion.div
@@ -360,7 +359,7 @@ export function LandingPage() {
               {[
                 ['PIN local', 'El acceso diario se desbloquea con un PIN creado en el dispositivo.', LockKeyhole],
                 ['Biometría', 'Si el equipo lo soporta, puedes usar rostro o huella para entrar más rápido.', ScanFace],
-                ['Nube opcional', 'Sincroniza solo cuando quieras tener respaldo o uso multidispositivo.', Cloud],
+                ['Sincronización segura', 'Sincroniza de forma opcional para tener respaldo. Tus datos viajan y se guardan completamente cifrados.', Cloud],
               ].map(([title, text, Icon]) => (
                 <div key={title as string} className="rounded-2xl border border-border/70 bg-card p-5 shadow-sm">
                   <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-secondary/20 text-secondary-foreground">

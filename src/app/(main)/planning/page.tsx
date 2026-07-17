@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react';
 import { Plus, BarChart2, CalendarDays } from 'lucide-react';
 import Link from 'next/link';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { useAllCommitments } from '@/features/planning/hooks/usePlanningData';
 import { useMonthlyCommitments, useMonthlySummary } from '@/features/planning/hooks/useMonthlyCommitments';
@@ -47,8 +46,7 @@ export default function PlanningPage() {
   const [historyCommitment, setHistoryCommitment] = useState<FinancialCommitment | null>(null);
   const router = useRouter();
 
-  const user = useLiveQuery(() => db.users.orderBy('id').first());
-  const ownerId = user?.id ?? '';
+  const ownerId = 'local-user';
 
   const allCommitments = useAllCommitments(ownerId);
   const pausedCommitments = usePausedCommitments(ownerId);
@@ -96,7 +94,7 @@ export default function PlanningPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ intentId: commitment.notificationIntentId })
         });
-        newIntentId = null;
+        newIntentId = undefined;
       } catch (e) {
         console.error('Failed to cancel', e);
       }

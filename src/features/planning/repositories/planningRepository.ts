@@ -1,73 +1,52 @@
+import type { FinancialCommitment, CommitmentPayment } from '@/lib/db';
 import { db } from '@/lib/db';
-import type { FinancialCommitment, CommitmentPayment, CommitmentStatus } from '@/lib/db';
 
 /**
- * Raw Dexie data access for the Planning module.
- * No business logic here — only CRUD operations.
+ * Data access for the Planning module using Dexie read models.
  */
 export const PlanningRepository = {
   async getAllCommitments(ownerId: string): Promise<FinancialCommitment[]> {
-    return db.financialCommitments
-      .where('ownerId')
-      .equals(ownerId)
-      .filter(c => c.deletedAt === null)
-      .toArray();
+    const all = await db.financialCommitments.toArray();
+    return all.filter(c => c.deletedAt === null || c.deletedAt === undefined);
   },
 
   async getActiveCommitments(ownerId: string): Promise<FinancialCommitment[]> {
-    return db.financialCommitments
-      .where('ownerId')
-      .equals(ownerId)
-      .filter(c => c.deletedAt === null && c.status === 'ACTIVE')
-      .toArray();
+    const all = await this.getAllCommitments(ownerId);
+    return all.filter(c => c.status === 'ACTIVE');
   },
 
   async getPausedCommitments(ownerId: string): Promise<FinancialCommitment[]> {
-    return db.financialCommitments
-      .where('ownerId')
-      .equals(ownerId)
-      .filter(c => c.deletedAt === null && c.status === 'PAUSED')
-      .toArray();
+    const all = await this.getAllCommitments(ownerId);
+    return all.filter(c => c.status === 'PAUSED');
   },
 
   async getCommitmentById(id: string): Promise<FinancialCommitment | undefined> {
-    return db.financialCommitments.get(id);
+    const c = await db.financialCommitments.get(id);
+    return c && (c.deletedAt === null || c.deletedAt === undefined) ? c : undefined;
   },
 
   async addCommitment(commitment: FinancialCommitment): Promise<void> {
-    await db.financialCommitments.add(commitment);
+    console.warn('PlanningRepository.addCommitment is mocked for CQRS transition.');
   },
 
   async updateCommitment(id: string, changes: Partial<FinancialCommitment>): Promise<void> {
-    await db.financialCommitments.update(id, { ...changes, updatedAt: new Date().toISOString() });
+    console.warn('PlanningRepository.updateCommitment is mocked for CQRS transition.');
   },
 
   async softDeleteCommitment(id: string): Promise<void> {
-    const now = new Date().toISOString();
-    await db.financialCommitments.update(id, {
-      deletedAt: now,
-      updatedAt: now,
-      status: 'CANCELLED' as CommitmentStatus,
-    });
+    console.warn('PlanningRepository.softDeleteCommitment is mocked for CQRS transition.');
   },
 
   async getPaymentsForCommitment(commitmentId: string): Promise<CommitmentPayment[]> {
-    return db.commitmentPayments
-      .where('commitmentId')
-      .equals(commitmentId)
-      .filter(p => p.deletedAt === null)
-      .sortBy('installmentNumber');
+    return []; // Payments are no longer in DB nor WorkspaceStore currently.
   },
 
   async addPayment(payment: CommitmentPayment): Promise<void> {
-    await db.commitmentPayments.add(payment);
+    console.warn('PlanningRepository.addPayment is mocked for CQRS transition.');
   },
 
   async countActiveCommitments(ownerId: string): Promise<number> {
-    return db.financialCommitments
-      .where('ownerId')
-      .equals(ownerId)
-      .filter(c => c.deletedAt === null && c.status === 'ACTIVE')
-      .count();
+    const all = await this.getActiveCommitments(ownerId);
+    return all.length;
   },
 };

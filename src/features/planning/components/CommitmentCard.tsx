@@ -25,6 +25,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { formatShortDate } from '../utils/dateUtils';
+import { calcRemainingAmount } from '../utils/amountUtils';
 import { COMMITMENT_TYPE_LABELS } from '../types';
 import type { FinancialCommitment } from '@/lib/db';
 import { CommitmentStatus, CommitmentType } from '@/lib/db';
@@ -122,25 +123,35 @@ export function CommitmentCard({
     }
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button, a')) {
+      return;
+    }
+    setShowOptions(v => !v);
+  };
+
   return (
     <>
       {showSuccess && <PaymentSuccessAnimation />}
 
       <div
+        onClick={handleCardClick}
         className={cn(
-          'relative bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden transition-all duration-200',
+          'relative bg-card rounded-3xl border border-border/50 shadow-sm overflow-hidden transition-all duration-200 cursor-pointer hover:shadow-md hover:border-border/80',
           isCompleted && 'opacity-60',
           isPaused && 'border-dashed'
         )}
       >
         {/* Urgency / overdue indicator */}
         {(isUrgent || isOverdue) && !isCompleted && (
-          <div
-            className={cn(
-              'absolute top-0 left-0 right-0 h-0.5',
-              isOverdue ? 'bg-destructive' : 'bg-gold'
-            )}
-          />
+          <>
+            <div
+              className={cn(
+                'absolute -top-4 left-0 right-0 h-8 opacity-20 blur-xl',
+                isOverdue ? 'bg-destructive' : 'bg-gold'
+              )}
+            />
+          </>
         )}
 
         <div className="p-5">
@@ -160,14 +171,6 @@ export function CommitmentCard({
               </div>
             </div>
 
-            {/* More options button */}
-            <button
-              onClick={() => setShowOptions(v => !v)}
-              className="flex-none p-1.5 rounded-full text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-              aria-label="Más opciones"
-            >
-              <MoreHorizontal className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Description & Notes */}
@@ -189,7 +192,7 @@ export function CommitmentCard({
                 <div
                   className="h-full bg-primary/40 rounded-full transition-all duration-500"
                   style={{
-                    width: `${Math.min(100, (commitment.currentInstallment / commitment.installments!) * 100)}%`,
+                    width: `${Math.min(100, ((commitment.currentInstallment || 0) / commitment.installments!) * 100)}%`,
                   }}
                 />
               </div>
@@ -247,9 +250,13 @@ export function CommitmentCard({
               <span className="text-2xl font-bold text-foreground tracking-tight flex items-center">
                 <MoneyDisplay amount={pastUnpaidInstallments.length > 0 ? totalAPagar : commitment.installmentAmount} />
               </span>
-              {hasInstallments && commitment.remainingAmount !== null && (
+              {hasInstallments && commitment.remainingAmount !== null && commitment.remainingAmount !== undefined && !Number.isNaN(commitment.remainingAmount) && (
                 <span className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1">
-                  Restan <MoneyDisplay amount={commitment.remainingAmount} />
+                  Restan <MoneyDisplay amount={
+                    commitment.amountTotal && commitment.installmentAmount
+                      ? calcRemainingAmount(commitment.amountTotal, commitment.currentInstallment || 0, commitment.installmentAmount)
+                      : (commitment.remainingAmount || 0)
+                  } />
                 </span>
               )}
             </div>
@@ -415,7 +422,7 @@ export function CommitmentCard({
             <button
               onClick={async () => {
                 if (onUpdateAlarm) {
-                  await onUpdateAlarm(tempHasReminder, tempReminderTime, tempReminderDays);
+                  await onUpdateAlarm(!!tempHasReminder, tempReminderTime, tempReminderDays || 0);
                 }
                 setShowAlarmDialog(false);
               }}

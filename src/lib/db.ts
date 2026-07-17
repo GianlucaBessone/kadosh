@@ -40,6 +40,7 @@ export interface User {
   lastName: string | null;
   avatarUrl: string | null;    // base64 data-URL stored locally (offline-first)
   isCloudLinked: boolean;     // true when a Supabase account is associated
+  isEmailConfirmed?: boolean;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -61,9 +62,63 @@ export interface Settings {
   deletedAt: string | null;
 }
 
+// ─── Proyecciones (Read Models) ───────────────────────────────────────────────
+
+export interface ProjectionState {
+  workspaceId: string;
+  lastProjectedSequence: number;
+  updatedAt: string;
+}
+
+export interface ProcessedProjectionEvent {
+  eventId: string;
+  workspaceId: string;
+  sequence: number;
+  projectedAt: string;
+  payloadChecksum: string;
+  checkpointVersion: string;
+}
+
+export interface ProjectionDeadLetter {
+  eventId: string;
+  workspaceId: string;
+  sequence: number;
+  eventType: string;
+  errorType: string;
+  errorMessage: string;
+  stack: string | null;
+  retries: number;
+  firstFailure: string;
+  lastFailure: string;
+  status: 'QUARANTINED' | 'RETRYING' | 'DISCARDED' | 'RECOVERED';
+}
+
+export interface ProjectionHealth {
+  workspaceId: string;
+  status: 'OK' | 'PROCESSING' | 'PAUSED' | 'WAITING_KEY' | 'RETRYING' | 'FAILED' | 'RECOVERING';
+  lastError: string | null;
+  updatedAt: string;
+}
+
+export interface ProjectionMetric {
+  workspaceId: string;
+  processedCount: number;
+  corruptedCount: number;
+  dlqCount: number;
+  avgProcessingTimeMs: number;
+  updatedAt: string;
+}
+
+export interface ProjectionCheckpoint {
+  workspaceId: string;
+  lastSequence: number;
+  checkpointVersion: string;
+  createdAt: string;
+}
+
 export interface Account {
   id: string;
-  userId: string;
+  workspaceId: string;
   name: string;
   balance: number;
   createdAt: string;
@@ -73,7 +128,7 @@ export interface Account {
 
 export interface Category {
   id: string;
-  userId: string;
+  workspaceId: string;
   name: string;
   type: string;
   icon: string | null;
@@ -85,7 +140,7 @@ export interface Category {
 
 export interface Transaction {
   id: string;
-  userId: string;
+  workspaceId: string;
   accountId: string;
   categoryId: string | null;
   type: string;
@@ -99,7 +154,7 @@ export interface Transaction {
 
 export interface SeedGoal {
   id: string;
-  userId: string;
+  workspaceId: string;
   name: string;
   targetAmount: number;
   currentAmount: number;
@@ -123,7 +178,7 @@ export interface SeedContribution {
 
 export interface Tithe {
   id: string;
-  userId: string;
+  workspaceId: string;
   amount: number;
   date: string;
   month: number;
@@ -132,6 +187,83 @@ export interface Tithe {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+}
+
+// ─── E2EE & Event Sourcing Interfaces ───────────────────────────────────────
+
+export interface Device {
+  id: string;
+  userId: string;
+  publicKey: string;
+  deviceName: string;
+  trusted: boolean;
+  lastSeen: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  type: string;
+  ownerId: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  role: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkspaceKey {
+  id: string;
+  workspaceId: string;
+  version: number;
+  createdAt: string;
+}
+
+export interface DeviceWorkspaceKey {
+  id: string;
+  workspaceKeyId: string;
+  deviceId: string;
+  wrappedKey: string;
+  createdAt: string;
+}
+
+export interface WorkspaceEvent {
+  id: string;
+  workspaceId: string;
+  aggregateId: string;
+  aggregateType: string;
+  eventType: string; // e.g. "TransactionCreated", "AccountUpdated"
+  sequence: number;
+  encryptedPayload: string; // cyphertext + IV en base64
+  schemaVersion: string; // e.g. "1.0"
+  encryptionVersion: string; // e.g. "v1"
+  ownerUserId: string;
+  deviceId: string;
+  keyId: string;
+  createdAt: string;
+  syncStatus: 'PENDING' | 'PROCESSING' | 'SYNCED' | 'ERROR'; // Local-only
+}
+
+export interface WorkspaceSnapshot {
+  id: string;
+  workspaceId: string;
+  snapshotVersion: number;
+  schemaVersion: string; // e.g. "1.0"
+  lastEventId: string;
+  eventCount: number;
+  snapshotPolicy: string;
+  keyId: string;
+  encryptedPayload: string;
+  createdByDeviceId: string;
+  createdAt: string;
 }
 
 export enum VerseCategory {
@@ -171,43 +303,30 @@ export interface FinancialCommitment {
   id: string;
   ownerId: string;
   name: string;
-  description: string | null;
-  categoryId: string | null;
-  type: CommitmentType;
-  status: CommitmentStatus;
-  /** Monto total del compromiso. null si es recurrente indefinido */
-  amountTotal: number | null;
-  /** Valor de cada cuota/pago */
+  amount: number;
   installmentAmount: number;
-  /** Cantidad de cuotas. null = recurrente indefinido */
-  installments: number | null;
-  /** Índice de la cuota actual (0-based) */
-  currentInstallment: number;
-  /** Monto restante. null si es recurrente */
-  remainingAmount: number | null;
+  type: CommitmentType;
   periodicity: CommitmentPeriodicity;
-  biweeklyPeriod?: 'Q1' | 'Q2';
-  /** Fecha de la primera cuota (ISO date) */
+  status: CommitmentStatus;
   firstDueDate: string;
-  /** Día del mes para periodicidad mensual */
-  dayOfMonth: number | null;
-  hasReminder: boolean;
-  /** Días de anticipación para el recordatorio */
-  reminderDaysBefore: number;
-  /** Hora del recordatorio (formato HH:mm, ej. '08:00') */
+  endDate?: string;
+  notes?: string;
+  isRecurring?: boolean;
+  installments?: number;
+  currentInstallment?: number;
+  customPeriodicityDays?: number;
+  dayOfMonth?: number;
+  biweeklyPeriod?: number;
+  amountTotal?: number;
+  categoryId?: string;
+  description?: string;
+  hasReminder?: boolean;
+  reminderDaysBefore?: number;
   reminderTime?: string;
-  /** ID del intento de notificación en Supabase para poder cancelarlo */
-  notificationIntentId?: string | null;
-  /** true = sin cuotas finitas, hasta que el usuario lo finalice */
-  isRecurring: boolean;
-  endDate: string | null;
-  notes: string | null;
-  /** Días entre cuotas para periodicidad personalizada */
-  customPeriodicityDays?: number | null;
-  /** Nombre para tipo de compromiso personalizado */
-  customTypeName?: string | null;
-  /** Fecha hasta la cual está pausado el compromiso */
-  pausedUntil?: string | null;
+  customTypeName?: string;
+  notificationIntentId?: string;
+  pausedUntil?: Date | string;
+  remainingAmount?: number;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -216,17 +335,16 @@ export interface FinancialCommitment {
 export interface CommitmentPayment {
   id: string;
   commitmentId: string;
-  installmentNumber: number;
   amount: number;
+  installmentNumber: number;
   date: string;
-  notes: string | null;
-  /** ID del movimiento financiero creado automáticamente */
-  transactionId: string | null;
+  status: 'PAID' | 'PARTIAL' | 'PENDING';
+  notes?: string;
+  transactionId?: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
 }
-
 export interface Notification {
   id: string;
   userId: string;
@@ -262,6 +380,8 @@ export interface SystemConfig {
   value: string;
 }
 
+import { createDexieProfiler } from './performance/DexieProfiler';
+
 export interface MotivationalVerse {
   id: string;
   text: string;
@@ -273,23 +393,251 @@ export interface MotivationalVerse {
 export class KadoshDB extends Dexie {
   users!: EntityTable<User, 'id'>;
   settings!: EntityTable<Settings, 'id'>;
+  workspaces!: EntityTable<Workspace, 'id'>;
+  workspaceMembers!: EntityTable<WorkspaceMember, 'id'>;
+  devices!: EntityTable<Device, 'id'>;
+  workspaceKeys!: EntityTable<WorkspaceKey, 'id'>;
+  deviceWorkspaceKeys!: EntityTable<DeviceWorkspaceKey, 'id'>;
+  workspaceEvents!: EntityTable<WorkspaceEvent, 'id'>;
+  workspaceSnapshots!: EntityTable<WorkspaceSnapshot, 'id'>;
+  dailyVerses!: EntityTable<DailyVerse, 'id'>;
+  notifications!: EntityTable<Notification, 'id'>;
+  syncQueue!: EntityTable<SyncQueue, 'id'>;
+  metadata!: EntityTable<Metadata, 'id'>;
+  systemConfig!: EntityTable<SystemConfig, 'key'>;
+  motivationalVerses!: EntityTable<MotivationalVerse, 'id'>;
+  
+  // Read Models (Projections)
+  projectionState!: EntityTable<ProjectionState, 'workspaceId'>;
   accounts!: EntityTable<Account, 'id'>;
   categories!: EntityTable<Category, 'id'>;
   transactions!: EntityTable<Transaction, 'id'>;
   seedGoals!: EntityTable<SeedGoal, 'id'>;
   seedContributions!: EntityTable<SeedContribution, 'id'>;
   tithes!: EntityTable<Tithe, 'id'>;
-  dailyVerses!: EntityTable<DailyVerse, 'id'>;
-  notifications!: EntityTable<Notification, 'id'>;
-  syncQueue!: EntityTable<SyncQueue, 'id'>;
-  metadata!: EntityTable<Metadata, 'id'>;
   financialCommitments!: EntityTable<FinancialCommitment, 'id'>;
   commitmentPayments!: EntityTable<CommitmentPayment, 'id'>;
-  systemConfig!: EntityTable<SystemConfig, 'key'>;
-  motivationalVerses!: EntityTable<MotivationalVerse, 'id'>;
+  processedProjectionEvents!: EntityTable<ProcessedProjectionEvent, 'eventId'>;
+  projectionDeadLetters!: EntityTable<ProjectionDeadLetter, 'eventId'>;
+  projectionHealth!: EntityTable<ProjectionHealth, 'workspaceId'>;
+  projectionMetrics!: EntityTable<ProjectionMetric, 'workspaceId'>;
+  projectionCheckpoints!: EntityTable<ProjectionCheckpoint, 'workspaceId'>;
 
   constructor() {
     super('KadoshDB');
+    this.version(14).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      processedProjectionEvents: 'eventId, workspaceId',
+      projectionDeadLetters: 'eventId, workspaceId, sequence, status',
+      projectionHealth: 'workspaceId, status',
+      projectionMetrics: 'workspaceId',
+      projectionCheckpoints: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(13).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      processedProjectionEvents: 'eventId, workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(12).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(11).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(10).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(9).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(8).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
+    this.version(7).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, eventType, syncStatus, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+      projectionState: 'workspaceId',
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+    });
     this.version(6).stores({
       users: 'id, email, isCloudLinked',
       settings: 'id, userId',
@@ -307,20 +655,6 @@ export class KadoshDB extends Dexie {
       commitmentPayments: 'id, commitmentId, status, date, deletedAt',
       systemConfig: 'key',
       motivationalVerses: 'id, category',
-    });
-    this.version(5).stores({
-      users: 'id, email, isCloudLinked',
-      settings: 'id, userId',
-      accounts: 'id, userId',
-      categories: 'id, userId, type',
-      transactions: 'id, userId, accountId, categoryId, type, date',
-      seedGoals: 'id, userId, status, createdAt',
-      seedContributions: 'id, seedGoalId, date',
-      tithes: 'id, userId, [month+year], createdAt',
-      dailyVerses: 'id, dayOfYear',
-      notifications: 'id, userId, read',
-      syncQueue: 'id, status, tableName, recordId',
-      metadata: 'id',
     });
     this.version(4).stores({
       users: 'id, email',
@@ -382,27 +716,44 @@ export class KadoshDB extends Dexie {
 }
 
 export const db = new KadoshDB();
+createDexieProfiler(db);
 
 export async function clearAllUserData() {
   await db.transaction('rw', [
-    db.users, db.settings, db.accounts, db.categories, db.transactions,
-    db.seedGoals, db.seedContributions, db.tithes, db.notifications,
-    db.syncQueue, db.metadata, db.financialCommitments, db.commitmentPayments,
-    db.motivationalVerses
+    db.users, db.settings, db.workspaces, db.workspaceMembers, db.devices,
+    db.workspaceKeys, db.deviceWorkspaceKeys, db.workspaceEvents, db.workspaceSnapshots,
+    db.notifications, db.syncQueue, db.metadata, db.motivationalVerses,
+    db.projectionState, db.accounts, db.categories, db.transactions,
+    db.seedGoals, db.seedContributions, db.tithes,
+    db.financialCommitments, db.commitmentPayments, db.processedProjectionEvents,
+    db.projectionDeadLetters, db.projectionHealth, db.projectionMetrics, db.projectionCheckpoints
   ], async () => {
     await db.users.clear();
     await db.settings.clear();
+    await db.workspaces.clear();
+    await db.workspaceMembers.clear();
+    await db.devices.clear();
+    await db.workspaceKeys.clear();
+    await db.deviceWorkspaceKeys.clear();
+    await db.workspaceEvents.clear();
+    await db.workspaceSnapshots.clear();
+    await db.notifications.clear();
+    await db.syncQueue.clear();
+    await db.metadata.clear();
+    await db.motivationalVerses.clear();
+    await db.projectionState.clear();
     await db.accounts.clear();
     await db.categories.clear();
     await db.transactions.clear();
     await db.seedGoals.clear();
     await db.seedContributions.clear();
     await db.tithes.clear();
-    await db.notifications.clear();
-    await db.syncQueue.clear();
-    await db.metadata.clear();
     await db.financialCommitments.clear();
     await db.commitmentPayments.clear();
-    await db.motivationalVerses.clear();
+    await db.processedProjectionEvents.clear();
+    await db.projectionDeadLetters.clear();
+    await db.projectionHealth.clear();
+    await db.projectionMetrics.clear();
+    await db.projectionCheckpoints.clear();
   });
 }

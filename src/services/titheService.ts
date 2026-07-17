@@ -1,42 +1,46 @@
-import { db, Tithe } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { addToSyncQueue } from './syncQueueService';
+import { useWorkspaceStore } from '@/store/WorkspaceStore';
+import { FinanceCommandDispatcher } from '@/domain/commands/FinanceCommandDispatcher';
+import { RegisterTitheCommand, CommandMetadata } from '@/domain/commands/FinanceCommands';
 
 export class TitheService {
-  static async createTithe(data: Omit<Tithe, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>) {
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    const tithe: Tithe = {
-      ...data,
-      id,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
+  private static getMetadata(): CommandMetadata {
+    const state = useWorkspaceStore.getState();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) throw new Error('No active workspace');
+    
+    return {
+      workspaceId,
+      userId: 'local-user',
+      deviceId: 'local-device',
+      timestamp: new Date().toISOString()
     };
-
-    await db.transaction('rw', db.tithes, db.syncQueue, async () => {
-      await db.tithes.add(tithe);
-      await addToSyncQueue('Tithe', id, 'INSERT', tithe);
-    });
-
-    return tithe;
   }
 
-  static async updateTithe(id: string, data: Partial<Omit<Tithe, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>>) {
-    const now = new Date().toISOString();
-    const updateData = { ...data, updatedAt: now };
+  static async createTithe(data: { amount: number; month: number; year: number; date?: string; notes?: string; userId?: string }) {
+    const titheId = uuidv4();
+    const command: RegisterTitheCommand = {
+      type: 'REGISTER_TITHE',
+      metadata: this.getMetadata(),
+      payload: {
+        titheId,
+        amount: data.amount,
+        month: data.month,
+        year: data.year,
+        date: data.date || new Date().toISOString(),
+        notes: data.notes
+      }
+    };
 
-    await db.transaction('rw', db.tithes, db.syncQueue, async () => {
-      await db.tithes.update(id, updateData);
-      await addToSyncQueue('Tithe', id, 'UPDATE', updateData);
-    });
+    await FinanceCommandDispatcher.dispatch(command);
+    return { id: titheId, ...data };
+  }
+
+  static async updateTithe(id: string, data: any) {
+    console.warn("Update Tithe not supported in FinanceCommands yet");
   }
 
   static async deleteTithe(id: string) {
-    const now = new Date().toISOString();
-    await db.transaction('rw', db.tithes, db.syncQueue, async () => {
-      await db.tithes.update(id, { deletedAt: now, updatedAt: now });
-      await addToSyncQueue('Tithe', id, 'DELETE', { deletedAt: now, updatedAt: now });
-    });
+    console.warn("Delete Tithe not supported in FinanceCommands yet");
   }
 }

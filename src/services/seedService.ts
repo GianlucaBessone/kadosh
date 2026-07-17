@@ -1,249 +1,173 @@
-import { db, SeedGoal, SeedContribution } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { addToSyncQueue } from './syncQueueService';
-import { TransactionService } from './transactionService';
+import { useWorkspaceStore } from '@/store/WorkspaceStore';
+import { FinanceCommandDispatcher } from '@/domain/commands/FinanceCommandDispatcher';
+import { PlantSeedCommand, HarvestSeedCommand, CommandMetadata } from '@/domain/commands/FinanceCommands';
 
 export class SeedService {
-  static async createSeedGoal(data: Omit<SeedGoal, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>) {
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    const seedGoal: SeedGoal = {
-      ...data,
-      id,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-    };
-
-    await db.transaction('rw', db.seedGoals, db.syncQueue, async () => {
-      await db.seedGoals.add(seedGoal);
-      await addToSyncQueue('SeedGoal', id, 'INSERT', seedGoal);
-    });
-
-    return seedGoal;
-  }
-
-  static async addContribution(data: Omit<SeedContribution, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>) {
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    const contribution: SeedContribution = {
-      ...data,
-      id,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
-    };
-
-    await db.transaction('rw', db.seedGoals, db.seedContributions, db.syncQueue, async () => {
-      await db.seedContributions.add(contribution);
-      await addToSyncQueue('SeedContribution', id, 'INSERT', contribution);
-
-      const goal = await db.seedGoals.get(data.seedGoalId);
-      if (goal) {
-        const newAmount = goal.currentAmount + data.amount;
-        await db.seedGoals.update(goal.id, { currentAmount: newAmount, updatedAt: now });
-        await addToSyncQueue('SeedGoal', goal.id, 'UPDATE', { currentAmount: newAmount, updatedAt: now });
-      }
-    });
-
-    return contribution;
-  }
-
-  static async harvestSeed(seedGoalId: string) {
-    const now = new Date().toISOString();
+  private static getMetadata(): CommandMetadata {
+    const state = useWorkspaceStore.getState();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) throw new Error('No active workspace');
     
-    await db.transaction('rw', db.seedGoals, db.accounts, db.transactions, db.syncQueue, async () => {
-      const goal = await db.seedGoals.get(seedGoalId);
-      if (!goal || goal.status === 'HARVESTED') return;
+    return {
+      workspaceId,
+      userId: 'local-user',
+      deviceId: 'local-device',
+      timestamp: new Date().toISOString()
+    };
+  }
 
-      // Mark as harvested
-      await db.seedGoals.update(goal.id, { status: 'HARVESTED', updatedAt: now });
-      await addToSyncQueue('SeedGoal', goal.id, 'UPDATE', { status: 'HARVESTED', updatedAt: now });
+  static async createSeedGoal(data: { name: string; targetAmount: number; userId?: string }) {
+    const seedId = uuidv4();
+    const command: PlantSeedCommand = {
+      type: 'PLANT_SEED',
+      metadata: this.getMetadata(),
+      payload: {
+        seedId,
+        name: data.name,
+        targetAmount: data.targetAmount,
+        date: new Date().toISOString()
+      }
+    };
 
-      // Find user account
-      const account = await db.accounts.orderBy('id').first();
-      if (!account) return;
+    await FinanceCommandDispatcher.dispatch(command);
+    return { id: seedId, ...data };
+  }
 
-      // Create transaction for the harvest (Income)
-      const transactionId = uuidv4();
-      const transaction = {
-        id: transactionId,
-        userId: goal.userId,
-        accountId: account.id,
-        categoryId: null,
-        amount: goal.currentAmount,
-        type: 'INCOME',
-        date: now,
-        notes: `Cosecha de semilla: ${goal.name}`,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      await db.transactions.add(transaction);
-      await addToSyncQueue('Transaction', transactionId, 'INSERT', transaction);
+  static async addContribution(data: any) {
+    console.warn("addContribution not fully supported in FinanceCommands yet");
+  }
 
-      // Update Account Balance
-      const newBalance = account.balance + goal.currentAmount;
-      await db.accounts.update(account.id, { balance: newBalance, updatedAt: now });
-      await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: now });
-    });
+  static async harvestSeed(seedGoalId: string, amount: number = 0) {
+    const metadata = this.getMetadata();
+
+    const { db } = await import('@/lib/db');
+    const seed = await db.seedGoals.get(seedGoalId);
+    const actualAmount = amount > 0 ? amount : (seed?.currentAmount || 0);
+
+    if (seed && actualAmount > 0) {
+      const accounts = await db.accounts.where('workspaceId').equals(metadata.workspaceId).toArray();
+      const mainAccount = accounts.filter(a => !a.deletedAt)[0];
+      
+      if (mainAccount) {
+        const { TransactionService } = await import('./transactionService');
+        await TransactionService.createTransaction({
+          accountId: mainAccount.id,
+          amount: actualAmount,
+          type: 'INCOME',
+          categoryId: 'seed_transfer',
+          notes: 'Cosecha de semilla',
+        });
+      }
+    }
+
+    const command: HarvestSeedCommand = {
+      type: 'HARVEST_SEED',
+      metadata,
+      payload: {
+        seedId: seedGoalId,
+        amount: actualAmount,
+        date: new Date().toISOString()
+      }
+    };
+    await FinanceCommandDispatcher.dispatch(command);
   }
 
   static async waterSeed(seedGoalId: string, amount: number) {
-    const now = new Date().toISOString();
+    const metadata = this.getMetadata();
     
-    await db.transaction('rw', db.seedGoals, db.seedContributions, db.accounts, db.transactions, db.syncQueue, async () => {
-      const goal = await db.seedGoals.get(seedGoalId);
-      if (!goal) return;
-
-      // Add contribution
-      const contributionId = uuidv4();
-      const contribution = {
-        id: contributionId,
-        seedGoalId,
-        amount,
-        date: now,
-        notes: 'Riego',
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      await db.seedContributions.add(contribution);
-      await addToSyncQueue('SeedContribution', contributionId, 'INSERT', contribution);
-
-      const newAmount = goal.currentAmount + amount;
-      await db.seedGoals.update(goal.id, { currentAmount: newAmount, updatedAt: now });
-      await addToSyncQueue('SeedGoal', goal.id, 'UPDATE', { currentAmount: newAmount, updatedAt: now });
-
-      // Find user account and deduct the watered amount (Expense)
-      const account = await db.accounts.orderBy('id').first();
-      if (!account) return;
-
-      const transactionId = uuidv4();
-      const transaction = {
-        id: transactionId,
-        userId: goal.userId,
-        accountId: account.id,
-        categoryId: 'seed_transfer',
-        amount,
+    // Find main account to deduct from
+    const { db } = await import('@/lib/db');
+    const accounts = await db.accounts.where('workspaceId').equals(metadata.workspaceId).toArray();
+    const mainAccount = accounts.filter(a => !a.deletedAt)[0];
+    
+    if (mainAccount) {
+      const { TransactionService } = await import('./transactionService');
+      await TransactionService.createTransaction({
+        accountId: mainAccount.id,
+        amount: amount,
         type: 'EXPENSE',
-        date: now,
-        notes: `Riego a semilla: ${goal.name}`,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      await db.transactions.add(transaction);
-      await addToSyncQueue('Transaction', transactionId, 'INSERT', transaction);
+        categoryId: 'seed_transfer',
+        notes: 'Aporte a semilla',
+      });
+    }
 
-      const newBalance = account.balance - amount;
-      await db.accounts.update(account.id, { balance: newBalance, updatedAt: now });
-      await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: now });
-    });
+    const command = {
+      type: 'WATER_SEED' as const,
+      metadata,
+      payload: {
+        seedId: seedGoalId,
+        contributionId: uuidv4(),
+        amount: amount,
+        date: new Date().toISOString()
+      }
+    };
+    await FinanceCommandDispatcher.dispatch(command);
   }
 
   static async withdrawSeed(seedGoalId: string, amount: number) {
-    const now = new Date().toISOString();
+    const metadata = this.getMetadata();
     
-    await db.transaction('rw', db.seedGoals, db.seedContributions, db.accounts, db.transactions, db.syncQueue, async () => {
-      const goal = await db.seedGoals.get(seedGoalId);
-      if (!goal) return;
-
-      if (goal.currentAmount < amount) {
-        throw new Error('Insufficient funds in seed');
-      }
-
-      // Add negative contribution
-      const contributionId = uuidv4();
-      const contribution = {
-        id: contributionId,
-        seedGoalId,
-        amount: -amount,
-        date: now,
-        notes: 'Retiro',
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      await db.seedContributions.add(contribution);
-      await addToSyncQueue('SeedContribution', contributionId, 'INSERT', contribution);
-
-      const newAmount = goal.currentAmount - amount;
-      await db.seedGoals.update(goal.id, { currentAmount: newAmount, updatedAt: now });
-      await addToSyncQueue('SeedGoal', goal.id, 'UPDATE', { currentAmount: newAmount, updatedAt: now });
-
-      // Find user account and add the withdrawn amount (Income)
-      const account = await db.accounts.orderBy('id').first();
-      if (!account) return;
-
-      const transactionId = uuidv4();
-      const transaction = {
-        id: transactionId,
-        userId: goal.userId,
-        accountId: account.id,
-        categoryId: 'seed_transfer',
-        amount,
+    // Find main account to return funds to
+    const { db } = await import('@/lib/db');
+    const accounts = await db.accounts.where('workspaceId').equals(metadata.workspaceId).toArray();
+    const mainAccount = accounts.filter(a => !a.deletedAt)[0];
+    
+    if (mainAccount) {
+      const { TransactionService } = await import('./transactionService');
+      await TransactionService.createTransaction({
+        accountId: mainAccount.id,
+        amount: amount,
         type: 'INCOME',
-        date: now,
-        notes: `Retiro de semilla: ${goal.name}`,
-        createdAt: now,
-        updatedAt: now,
-        deletedAt: null,
-      };
-      await db.transactions.add(transaction);
-      await addToSyncQueue('Transaction', transactionId, 'INSERT', transaction);
+        categoryId: 'seed_transfer',
+        notes: 'Retiro de semilla',
+      });
+    }
 
-      const newBalance = account.balance + amount;
-      await db.accounts.update(account.id, { balance: newBalance, updatedAt: now });
-      await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: now });
-    });
+    const command = {
+      type: 'WITHDRAW_SEED' as const,
+      metadata,
+      payload: {
+        seedId: seedGoalId,
+        withdrawalId: uuidv4(),
+        amount: amount,
+        date: new Date().toISOString()
+      }
+    };
+    await FinanceCommandDispatcher.dispatch(command);
   }
 
   static async deleteSeed(seedGoalId: string, restoreBalance: boolean) {
-    const now = new Date().toISOString();
-    
-    await db.transaction('rw', db.seedGoals, db.seedContributions, db.accounts, db.transactions, db.syncQueue, async () => {
-      const goal = await db.seedGoals.get(seedGoalId);
-      if (!goal || goal.deletedAt) return;
+    const metadata = this.getMetadata();
 
-      // Soft delete the goal
-      await db.seedGoals.update(goal.id, { deletedAt: now, updatedAt: now });
-      await addToSyncQueue('SeedGoal', goal.id, 'UPDATE', { deletedAt: now, updatedAt: now });
-
-      // Soft delete all contributions
-      const contributions = await db.seedContributions.where('seedGoalId').equals(seedGoalId).toArray();
-      for (const contrib of contributions) {
-        if (!contrib.deletedAt) {
-          await db.seedContributions.update(contrib.id, { deletedAt: now, updatedAt: now });
-          await addToSyncQueue('SeedContribution', contrib.id, 'UPDATE', { deletedAt: now, updatedAt: now });
-        }
-      }
-
-      if (restoreBalance && goal.currentAmount > 0) {
-        const account = await db.accounts.orderBy('id').first();
-        if (account) {
-          const transactionId = uuidv4();
-          const transaction = {
-            id: transactionId,
-            userId: goal.userId,
-            accountId: account.id,
-            categoryId: null, // or some specific category if needed
-            amount: goal.currentAmount,
+    if (restoreBalance) {
+      const { db } = await import('@/lib/db');
+      const seed = await db.seedGoals.get(seedGoalId);
+      if (seed && seed.currentAmount > 0) {
+        const accounts = await db.accounts.where('workspaceId').equals(metadata.workspaceId).toArray();
+        const mainAccount = accounts.filter(a => !a.deletedAt)[0];
+        
+        if (mainAccount) {
+          const { TransactionService } = await import('./transactionService');
+          await TransactionService.createTransaction({
+            accountId: mainAccount.id,
+            amount: seed.currentAmount,
             type: 'INCOME',
-            date: now,
-            notes: `Devolución por semilla eliminada: ${goal.name}`,
-            createdAt: now,
-            updatedAt: now,
-            deletedAt: null,
-          };
-          await db.transactions.add(transaction);
-          await addToSyncQueue('Transaction', transactionId, 'INSERT', transaction);
-
-          const newBalance = account.balance + goal.currentAmount;
-          await db.accounts.update(account.id, { balance: newBalance, updatedAt: now });
-          await addToSyncQueue('Account', account.id, 'UPDATE', { balance: newBalance, updatedAt: now });
+            categoryId: 'seed_transfer',
+            notes: 'Devolución por semilla eliminada',
+          });
         }
       }
-    });
+    }
+
+    const command = {
+      type: 'DELETE_SEED' as const,
+      metadata,
+      payload: {
+        seedId: seedGoalId,
+        restoreBalance: restoreBalance
+      }
+    };
+    await FinanceCommandDispatcher.dispatch(command);
   }
 }

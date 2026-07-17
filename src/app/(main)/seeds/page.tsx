@@ -5,21 +5,18 @@ import Link from 'next/link'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
-import { useLiveQuery } from 'dexie-react-hooks'
-import { db } from '@/lib/db'
 import { formatMoney } from '@/lib/utils'
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay'
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries'
 import { MotivationalVerseService } from '@/services/motivationalVerseService'
 import { useEffect, useState } from 'react'
 
 export default function SeedsPage() {
-  const seeds = useLiveQuery(() => 
-    db.seedGoals
-      .orderBy('createdAt')
-      .reverse()
-      .filter(seed => !seed.deletedAt)
-      .toArray()
-  ) || [];
+  const seeds = WorkspaceQueries.useSeeds();
+  // Filter and sort manually
+  const filteredSeeds = [...seeds]
+    .filter(seed => !seed.deletedAt)
+    .sort((a, b) => new Date(b.createdAt || b.id).getTime() - new Date(a.createdAt || a.id).getTime());
   const [verse, setVerse] = useState<{ text: string, reference: string } | null>(null);
 
   useEffect(() => {
@@ -55,7 +52,7 @@ export default function SeedsPage() {
           </div>
         )}
 
-        {seeds.map((seed) => {
+        {filteredSeeds.map((seed) => {
           const progress = Math.min(100, Math.round((seed.currentAmount / seed.targetAmount) * 100))
           const isHarvested = seed.status === 'HARVESTED'
           const isReady = progress >= 100 && !isHarvested

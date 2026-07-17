@@ -20,7 +20,7 @@ export function PlanningModeModal({ settings, onComplete }: PlanningModeModalPro
     if (!selected) return;
     setLoading(true);
     try {
-      if (settings) {
+      if (settings && settings.id) {
         await db.settings.update(settings.id, {
           planningMode: selected,
           hasSelectedPlanningMode: true,

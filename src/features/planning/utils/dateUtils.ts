@@ -147,8 +147,7 @@ export function installmentAppliesToPeriod(
   period: PlanningPeriod
 ): boolean {
   if (period === 'MONTH') return true;
-  
-  // If user explicitly assigned a monthly (or higher) commitment to Q1 or Q2
+
   const isMonthlyOrHigher = [
     CommitmentPeriodicity.MONTHLY,
     CommitmentPeriodicity.BIMONTHLY,
@@ -158,16 +157,33 @@ export function installmentAppliesToPeriod(
   ].includes(commitment.periodicity);
   
   if (isMonthlyOrHigher && commitment.biweeklyPeriod) {
-    return commitment.biweeklyPeriod === period;
+    const assignedPeriod = commitment.biweeklyPeriod === 1 ? 'Q1' : 'Q2';
+    if (assignedPeriod === period) return true;
+    
+    // If viewing Q2, carry over unpaid Q1 commitments
+    if (period === 'Q2' && assignedPeriod === 'Q1') {
+      const isUnpaid = installment.installmentIndex >= (commitment.currentInstallment || 0);
+      if (isUnpaid) return true;
+    }
+    
+    return false;
   }
   
   // Otherwise, fallback to the actual date
   const day = installment.dueDate.getDate();
-  if (period === 'Q1') {
-    return day >= 1 && day <= 15;
-  } else {
-    return day >= 16;
+  const isQ1 = day <= 15;
+  const isQ2 = day > 15;
+  
+  if (period === 'Q1' && isQ1) return true;
+  if (period === 'Q2' && isQ2) return true;
+  
+  // Carry over unpaid Q1 items to Q2
+  if (period === 'Q2' && isQ1) {
+    const isUnpaid = installment.installmentIndex >= (commitment.currentInstallment || 0);
+    if (isUnpaid) return true;
   }
+  
+  return false;
 }
 
 /** Short formatted date string, e.g. "15 Ago" */

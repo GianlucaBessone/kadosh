@@ -13,47 +13,67 @@ export async function GET(request: Request) {
     const lastSyncAt = searchParams.get('lastSyncAt');
 
     const serverTimestamp = new Date().toISOString();
-
     const dateFilter = lastSyncAt ? { gt: new Date(lastSyncAt) } : undefined;
 
-    // Fetch changes for all user-related tables
-    const filter = dateFilter ? { updatedAt: dateFilter, userId: user.id } : { userId: user.id };
-    
-    // Note: some tables like SeedContributions depend on SeedGoal, not userId directly.
-    const seedGoals = await prisma.seedGoal.findMany({ where: filter });
-    const seedGoalIds = seedGoals.map(g => g.id);
-    
+    // 1. Obtener Workspaces a los que pertenece el usuario
+    const userWorkspaces = await prisma.workspaceMember.findMany({
+      where: { userId: user.id },
+      select: { workspaceId: true }
+    });
+    const workspaceIds = userWorkspaces.map(w => w.workspaceId);
+
+    // 2. Obtener Eventos y Snapshots de los Workspaces
+    // TODO: En producción, usar lastSequence por Workspace en lugar de lastSyncAt global.
     const [
-      accounts,
-      categories,
-      transactions,
-      seedContributions,
-      tithes,
+      workspaceEvents,
+      workspaceSnapshots,
+      workspaceKeys,
+      deviceWorkspaceKeys
+    ] = await Promise.all([
+      prisma.workspaceEvent.findMany({
+        where: {
+          workspaceId: { in: workspaceIds },
+          ...(dateFilter ? { createdAt: dateFilter } : {})
+        },
+        orderBy: { sequence: 'asc' }
+      }),
+      prisma.workspaceSnapshot.findMany({
+        where: {
+          workspaceId: { in: workspaceIds },
+          ...(dateFilter ? { createdAt: dateFilter } : {})
+        }
+      }),
+      prisma.workspaceKey.findMany({
+        where: {
+          workspaceId: { in: workspaceIds },
+          ...(dateFilter ? { createdAt: dateFilter } : {})
+        }
+      }),
+      // Solo llaves envueltas para mis dispositivos
+      prisma.deviceWorkspaceKey.findMany({
+        where: {
+          device: { userId: user.id },
+          ...(dateFilter ? { createdAt: dateFilter } : {})
+        }
+      })
+    ]);
+
+    // 3. Obtener metadatos no cifrados (Configuraciones, Notificaciones, etc.)
+    const nonFinancialFilter = dateFilter ? { updatedAt: dateFilter, userId: user.id } : { userId: user.id };
+    const [
       settings,
       notifications
     ] = await Promise.all([
-      prisma.account.findMany({ where: filter }),
-      prisma.category.findMany({ where: filter }),
-      prisma.transaction.findMany({ where: filter }),
-      prisma.seedContribution.findMany({
-        where: dateFilter ? {
-          updatedAt: dateFilter,
-          seedGoal: { userId: user.id }
-        } : { seedGoal: { userId: user.id } }
-      }),
-      prisma.tithe.findMany({ where: filter }),
-      prisma.settings.findMany({ where: dateFilter ? { updatedAt: dateFilter, userId: user.id } : { userId: user.id } }),
-      prisma.notification.findMany({ where: filter }),
+      prisma.settings.findMany({ where: nonFinancialFilter }),
+      prisma.notification.findMany({ where: nonFinancialFilter }),
     ]);
 
     return NextResponse.json({
       serverTimestamp,
-      accounts,
-      categories,
-      transactions,
-      seedGoals,
-      seedContributions,
-      tithes,
+      workspaceEvents,
+      workspaceSnapshots,
+      workspaceKeys,
+      deviceWorkspaceKeys,
       settings,
       notifications
     });

@@ -1,7 +1,7 @@
 'use client';
 
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
 import { ArrowLeft, History, Search, SlidersHorizontal, X, Download } from 'lucide-react';
 import Link from 'next/link';
 import { useState, useMemo } from 'react';
@@ -41,7 +41,7 @@ const TYPES = [
 ];
 
 export default function TransactionsPage() {
-  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
+  const accounts = WorkspaceQueries.useAccounts();
   const totalBalance = accounts.reduce((acc, account) => acc + account.balance, 0);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,25 +61,25 @@ export default function TransactionsPage() {
     categories: []
   });
 
-  const rawTransactions = useLiveQuery(async () => {
-    const txs = await db.transactions.toArray();
-    const tithes = await db.tithes.toArray();
-    
+  const allTransactions = WorkspaceQueries.useTransactions();
+  const tithes = WorkspaceQueries.useTithes();
+  
+  const rawTransactions = useMemo(() => {
     const mappedTithes = tithes.map(t => ({
       id: t.id,
       userId: t.userId,
       accountId: '',
       categoryId: 'tithe',
-      type: 'EXPENSE',
+      type: 'EXPENSE' as const,
       amount: t.amount,
       date: t.date,
-      notes: t.notes || 'Entrega de Diezmo',
+      description: t.notes || 'Entrega de Diezmo',
       createdAt: t.createdAt,
       updatedAt: t.updatedAt,
       deletedAt: t.deletedAt
     }));
 
-    const all = [...txs, ...mappedTithes];
+    const all = [...allTransactions, ...mappedTithes];
     return all.sort((a, b) => {
       // Comparar por fecha (solo día, ignorando hora si es posible, o directamente el tiempo)
       // Como guardamos la fecha completa en date, usaremos el valor de date.
@@ -95,12 +95,12 @@ export default function TransactionsPage() {
       // Si son del mismo día, ordenar por hora de registro
       return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
     });
-  }) || [];
+  }, [allTransactions, tithes]);
 
   const filteredTransactions = useMemo(() => {
     return rawTransactions.filter(tx => {
-      const isSeed = tx.notes?.toLowerCase().includes('semilla');
-      const isTithe = tx.categoryId === 'tithe' || tx.notes?.toLowerCase().includes('diezmo');
+      const isSeed = tx.description?.toLowerCase().includes('semilla');
+      const isTithe = tx.categoryId === 'tithe' || tx.description?.toLowerCase().includes('diezmo');
       const txTypeGroup = isTithe ? 'TITHE' 
         : isSeed ? (tx.type === 'INCOME' ? 'HARVEST' : 'WATER') 
         : tx.type;
@@ -108,7 +108,7 @@ export default function TransactionsPage() {
       // 1. Search Query
       if (searchQuery) {
         const query = searchQuery.toLowerCase();
-        if (!tx.notes?.toLowerCase().includes(query)) return false;
+        if (!tx.description?.toLowerCase().includes(query)) return false;
       }
 
       // 2. Quick Filter

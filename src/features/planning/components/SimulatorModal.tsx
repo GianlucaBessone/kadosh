@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { X, TrendingUp, TrendingDown, Minus, Droplet, HandHeart } from 'lucide-react';
+import { X, Droplet, HandHeart } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
@@ -11,7 +11,7 @@ import {
   calcTitheEstimate,
   calcPercentageCommitted,
 } from '../utils/amountUtils';
-import type { FinancialCommitment } from '@/lib/db';
+
 import Link from 'next/link';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
 import type { PlanningPeriod, MonthlyCommitmentItem } from '../types';
@@ -50,7 +50,8 @@ function InputField({
           onChange={onChange}
           placeholder={placeholder}
           baseTextSize="text-base"
-          className="w-full h-12 pl-8 pr-4 rounded-2xl bg-muted border border-border/40 text-foreground text-base font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all text-left"
+          plain={false}
+          className="w-full h-12 pl-8 pr-4 rounded-2xl bg-muted border border-border/40 text-base font-semibold focus:outline-none focus:ring-2 focus:ring-primary/40 transition-all text-left"
         />
       </div>
     </div>
