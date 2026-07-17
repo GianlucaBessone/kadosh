@@ -50,26 +50,7 @@ export function DatePicker({
     setOpen(false)
   }
 
-  const handleQuickAction = (action: "today" | "tomorrow" | "startMonth" | "endMonth" | "clear") => {
-    const today = new Date()
-    switch (action) {
-      case "today":
-        handleSelect(today)
-        break
-      case "tomorrow":
-        handleSelect(addDays(today, 1))
-        break
-      case "startMonth":
-        handleSelect(startOfMonth(currentMonth))
-        break
-      case "endMonth":
-        handleSelect(endOfMonth(currentMonth))
-        break
-      case "clear":
-        handleSelect(undefined)
-        break
-    }
-  }
+
 
   const toggleViewMode = () => {
     if (viewMode === "calendar") setViewMode("month")
@@ -153,7 +134,7 @@ export function DatePicker({
                   animate={{ opacity: 1, scale: 1 }}
                   exit={{ opacity: 0, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute inset-0"
+                  className="absolute inset-0 flex justify-center"
                 >
                   <DayPicker
                     mode="single"
@@ -243,24 +224,7 @@ export function DatePicker({
           
         </div>
         
-        {/* Quick Actions Footer */}
-        <div className="border-t border-border/50 bg-muted/20 px-4 py-3 overflow-x-auto scrollbar-hide flex gap-2" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
-          {[
-            { label: 'Hoy', action: 'today' },
-            { label: 'Mañana', action: 'tomorrow' },
-            { label: 'Inicio de mes', action: 'startMonth' },
-            { label: 'Fin de mes', action: 'endMonth' },
-            { label: 'Limpiar', action: 'clear' },
-          ].map(chip => (
-            <button
-              key={chip.action}
-              onClick={() => handleQuickAction(chip.action as any)}
-              className="flex-none px-3 py-1.5 rounded-full bg-background border border-border/50 text-xs font-medium hover:bg-muted transition-colors whitespace-nowrap text-foreground"
-            >
-              {chip.label}
-            </button>
-          ))}
-        </div>
+
 
       </PickerContent>
     </Picker>
