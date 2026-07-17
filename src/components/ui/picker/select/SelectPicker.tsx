@@ -43,8 +43,8 @@ export function SelectPicker({
   const filteredItems = React.useMemo(() => {
     if (!search) return items
     const lowerSearch = search.toLowerCase()
-    return items.filter(item => 
-      item.label.toLowerCase().includes(lowerSearch) || 
+    return items.filter(item =>
+      item.label.toLowerCase().includes(lowerSearch) ||
       item.description?.toLowerCase().includes(lowerSearch)
     )
   }, [items, search])
@@ -66,11 +66,11 @@ export function SelectPicker({
     setOpen(false)
   }, [onChange])
 
-  const isSearchable = searchable !== undefined ? searchable : items.length > 6;
+  const isSearchable = searchable !== undefined ? searchable : items.length > 12;
 
   return (
     <Picker open={open} onOpenChange={handleOpenChange}>
-      <PickerTrigger 
+      <PickerTrigger
         disabled={disabled}
         className={cn(
           "flex h-10 w-full items-center justify-between rounded-xl border border-input bg-card px-3 py-2 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50",
@@ -83,26 +83,26 @@ export function SelectPicker({
         <ChevronDownIcon className="h-4 w-4 text-primary shrink-0" />
       </PickerTrigger>
       {name && <input type="hidden" name={name} value={value || ""} />}
-      
+
       <PickerContent className="w-[--radix-popover-trigger-width] min-w-[240px] p-0 flex flex-col">
         {isSearchable && (
           <div className="p-2 border-b border-border/50">
-            <PickerSearch 
-              placeholder="Buscar..." 
-              value={search} 
-              onChange={e => setSearch(e.target.value)} 
+            <PickerSearch
+              placeholder="Buscar..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
             />
           </div>
         )}
-        
+
         <div className="py-1 max-h-[300px] overflow-y-auto [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent [&::-webkit-scrollbar-thumb]:bg-muted-foreground/20 [&::-webkit-scrollbar-thumb]:rounded-full">
           {filteredItems.length === 0 ? (
             <PickerEmpty />
           ) : (
             <>
               {groupedItems.default?.map(item => (
-                <PickerOption 
-                  key={item.value} 
+                <PickerOption
+                  key={item.value}
                   selected={item.value === value}
                   onClick={() => handleSelect(item.value)}
                 >
@@ -117,12 +117,12 @@ export function SelectPicker({
                   </div>
                 </PickerOption>
               ))}
-              
+
               {Object.entries(groupedItems).filter(([g]) => g !== "default").map(([group, groupItems]) => (
                 <PickerSection key={group} title={group}>
                   {groupItems.map(item => (
-                    <PickerOption 
-                      key={item.value} 
+                    <PickerOption
+                      key={item.value}
                       selected={item.value === value}
                       onClick={() => handleSelect(item.value)}
                     >

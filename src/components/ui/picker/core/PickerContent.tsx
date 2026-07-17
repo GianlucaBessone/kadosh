@@ -35,7 +35,10 @@ export function PickerContent({
                 className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm"
               />
             </DialogPrimitive.Overlay>
-            <DialogPrimitive.Content asChild>
+            <DialogPrimitive.Content
+              asChild
+              onOpenAutoFocus={(e) => e.preventDefault()}
+            >
               <motion.div
                 initial={{ y: "100%" }}
                 animate={{ y: 0 }}
@@ -64,6 +67,7 @@ export function PickerContent({
           <PopoverPrimitive.Content
             align={align}
             sideOffset={sideOffset}
+            onOpenAutoFocus={(e) => e.preventDefault()}
             asChild
           >
             <motion.div
