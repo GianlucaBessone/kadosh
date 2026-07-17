@@ -75,7 +75,8 @@ export default function HomePage() {
   currentMonthStart.setHours(0, 0, 0, 0);
   
   const workspace = WorkspaceQueries.useActiveWorkspace();
-  const settingsQuery = useLiveQuery(() => db.settings.orderBy('id').first());
+  const settingsArray = useLiveQuery(() => db.settings.toArray());
+  const settingsQuery = settingsArray ? settingsArray[0] : undefined;
 
   const currentMonthTx = useMemo(() => allTransactions.filter(tx => tx.date >= currentMonthStart.toISOString()), [allTransactions, currentMonthStart]);
 
@@ -92,7 +93,8 @@ export default function HomePage() {
   const allSeeds = WorkspaceQueries.useSeeds();
   const activeSeedsCount = allSeeds.filter(seed => seed.status === 'ACTIVE' && !seed.deletedAt).length;
 
-  const userName = 'Usuario';
+  const user = useLiveQuery(() => db.users.orderBy('id').first());
+  const userName = user?.name ? user.name.split(' ')[0] : 'Usuario';
 
   const currentMonthVal = currentMonthStart.getMonth() + 1;
   const currentYearVal = currentMonthStart.getFullYear();
@@ -300,7 +302,7 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-      {settingsQuery !== undefined && (!settingsQuery || !settingsQuery.hasSelectedPlanningMode) && (
+      {settingsArray !== undefined && (!settingsQuery || !settingsQuery.hasSelectedPlanningMode) && (
         <PlanningModeModal 
           settings={settingsQuery} 
           onComplete={() => {

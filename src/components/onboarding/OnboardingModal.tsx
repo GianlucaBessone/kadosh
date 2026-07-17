@@ -18,6 +18,8 @@ import {
   Smartphone,
   Share,
   PlusSquare,
+  ShieldCheck,
+  CloudOff,
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 
@@ -113,7 +115,29 @@ const SLIDES: OnboardingSlide[] = [
     gradient: 'from-[#85A6B8]/20 to-[#85A6B8]/5',
     accentColor: 'text-[#85A6B8]',
   },
-  // ── 6 · Reportes (placeholder) ──────────────
+  // ── 6 · Privacidad ──────────────────────────
+  {
+    id: 'privacy',
+    icon: <ShieldCheck className="h-10 w-10" />,
+    badge: 'Privacidad Absoluta',
+    title: 'Tu información es solo tuya',
+    subtitle: 'Seguridad de alto nivel',
+    body: 'Tus datos están protegidos con cifrado de extremo a extremo, el mismo estándar utilizado por entidades financieras, militares y gubernamentales.\n\nNadie más puede leer tus números, ni siquiera nosotros. Eres el único dueño de tu información.',
+    gradient: 'from-[#85A6B8]/20 to-[#85A6B8]/5',
+    accentColor: 'text-[#85A6B8]',
+  },
+  // ── 7 · Offline First ───────────────────────
+  {
+    id: 'offline',
+    icon: <CloudOff className="h-10 w-10" />,
+    badge: 'Siempre Disponible',
+    title: 'Funciona donde estés',
+    subtitle: 'Sin depender de internet',
+    body: 'Tus datos viven primero en tu dispositivo, permitiéndote registrar movimientos en cualquier momento sin conexión.\n\nSi decides sincronizarlos en la nube para tener un respaldo, viajarán completamente encriptados.',
+    gradient: 'from-[#7FA58A]/20 to-[#7FA58A]/5',
+    accentColor: 'text-[#7FA58A]',
+  },
+  // ── 8 · Reportes (placeholder) ──────────────
   {
     id: 'reports',
     icon: <BarChart3 className="h-10 w-10" />,
