@@ -83,7 +83,7 @@ export function DatePicker({
 
   return (
     <Picker open={open} onOpenChange={setOpen}>
-      <PickerTrigger 
+      <PickerTrigger
         disabled={disabled}
         className={cn(
           "flex h-10 w-full items-center justify-between rounded-xl border border-input bg-card px-3 py-2 text-sm shadow-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/30 disabled:cursor-not-allowed disabled:opacity-50",
@@ -96,28 +96,28 @@ export function DatePicker({
         <CalendarIcon className="h-4 w-4 text-primary shrink-0" />
       </PickerTrigger>
       {name && <input type="hidden" name={name} value={value ? value.toISOString().split('T')[0] : ""} />}
-      
+
       <PickerContent className="w-auto p-0 flex flex-col justify-center min-w-[280px] overflow-hidden rounded-2xl">
         <div className="p-4 bg-card flex flex-col gap-3">
-          
+
           {/* Custom Header */}
           <div className="flex items-center justify-between">
-            <button 
+            <button
               onClick={viewMode === "year" ? prevYearPage : prevMonth}
               className="p-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
               <ChevronLeft className="w-5 h-5" />
             </button>
-            <button 
+            <button
               onClick={toggleViewMode}
               className="px-3 py-1 rounded-full hover:bg-muted font-semibold text-[15px] tracking-tight transition-colors capitalize"
             >
-              {viewMode === "year" 
+              {viewMode === "year"
                 ? `${years[0]} - ${years[11]}`
                 : format(currentMonth, "MMMM yyyy", { locale: es })
               }
             </button>
-            <button 
+            <button
               onClick={viewMode === "year" ? nextYearPage : nextMonth}
               className="p-1.5 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
             >
@@ -137,6 +137,7 @@ export function DatePicker({
                   className="absolute inset-0 flex justify-center"
                 >
                   <DayPicker
+                    className="-mt-2"
                     mode="single"
                     selected={value}
                     onSelect={handleSelect}
@@ -180,8 +181,8 @@ export function DatePicker({
                         onClick={() => handleMonthSelect(i)}
                         className={cn(
                           "h-12 rounded-2xl flex items-center justify-center text-sm font-medium capitalize transition-colors",
-                          isSelected 
-                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20" 
+                          isSelected
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                             : "hover:bg-muted text-foreground"
                         )}
                       >
@@ -208,8 +209,8 @@ export function DatePicker({
                         onClick={() => handleYearSelect(y)}
                         className={cn(
                           "h-12 rounded-2xl flex items-center justify-center text-sm font-medium transition-colors",
-                          isSelected 
-                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20" 
+                          isSelected
+                            ? "bg-primary text-primary-foreground shadow-sm shadow-primary/20"
                             : "hover:bg-muted text-foreground"
                         )}
                       >
@@ -221,9 +222,9 @@ export function DatePicker({
               )}
             </AnimatePresence>
           </div>
-          
+
         </div>
-        
+
 
 
       </PickerContent>
