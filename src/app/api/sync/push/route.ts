@@ -9,54 +9,54 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const { operations } = await request.json();
+    const { events } = await request.json();
 
-    if (!Array.isArray(operations)) {
+    if (!Array.isArray(events)) {
       return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     }
 
-    const modelsWithUserId = [
-      'Settings', 'Account', 'Category', 'Transaction', 'SeedGoal', 'Tithe', 
-      'Notification', 'SupportTicket', 'Feedback', 'Donation', 'Prayer', 'DeveloperInfoRequest'
-    ];
+    if (events.length === 0) {
+      return NextResponse.json({ success: true, timestamp: new Date().toISOString() });
+    }
 
-    // Process all operations in a transaction
+    // 1. Obtener los Workspaces a los que pertenece el usuario
+    const userWorkspaces = await prisma.workspaceMember.findMany({
+      where: { userId: user.id },
+      select: { workspaceId: true }
+    });
+    const validWorkspaceIds = new Set(userWorkspaces.map(w => w.workspaceId));
+
+    // 2. Procesar e insertar los eventos de forma transaccional
     await prisma.$transaction(async (tx) => {
-      for (const op of operations) {
-        const { tableName, recordId, operation, payload } = op;
-        const modelName = tableName.charAt(0).toLowerCase() + tableName.slice(1);
-        const model = (tx as unknown as Record<string, { upsert: (args: unknown) => Promise<unknown>; update: (args: unknown) => Promise<unknown>; delete: (args: unknown) => Promise<unknown> }>)[modelName];
-        if (!model) continue;
-
-        if (payload && modelsWithUserId.includes(tableName)) {
-          payload.userId = user.id;
+      for (const event of events) {
+        // Validar membresía del Workspace
+        if (!validWorkspaceIds.has(event.workspaceId)) {
+          throw new Error(`Unauthorized access to workspace ${event.workspaceId}`);
         }
 
-        try {
-          if (operation === 'INSERT') {
-            await model.upsert({
-              where: { id: recordId },
-              create: payload,
-              update: payload,
-            });
-          } else if (operation === 'UPDATE') {
-            await model.update({
-              where: { id: recordId },
-              data: payload,
-            });
-          } else if (operation === 'DELETE') {
-            // Ensure we don't delete records if we don't own them.
-            // Since we don't have RLS, we could theoretically do a deleteMany to include userId,
-            // but for simplicity and backwards compatibility with upsert/update, we'll just use delete.
-            // A more secure implementation would check ownership first.
-            await model.delete({
-              where: { id: recordId },
-            });
+        // Insertar (o ignorar si ya existe gracias a idempotencia, usando upsert)
+        await tx.workspaceEvent.upsert({
+          where: { id: event.id },
+          create: {
+            id: event.id,
+            workspaceId: event.workspaceId,
+            aggregateId: event.aggregateId,
+            aggregateType: event.aggregateType,
+            eventType: event.eventType,
+            sequence: event.sequence,
+            encryptedPayload: event.encryptedPayload,
+            schemaVersion: event.schemaVersion || "1.0",
+            encryptionVersion: event.encryptionVersion || "v1",
+            ownerUserId: event.ownerUserId,
+            deviceId: event.deviceId || null,
+            keyId: event.keyId,
+            createdAt: event.createdAt ? new Date(event.createdAt) : new Date(),
+          },
+          update: {
+            // El Event Store es inmutable, por lo que las actualizaciones sobre eventos existentes
+            // normalmente son ignoradas, o solo actualizan metadatos si fuera necesario.
           }
-        } catch (e) {
-          console.error(`Error processing operation ${operation} on ${tableName}:`, e);
-          throw e; // Re-throw to abort the transaction properly
-        }
+        });
       }
     });
 

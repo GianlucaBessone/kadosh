@@ -19,7 +19,7 @@ export function PulseManager() {
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         
-        const txsToday = await db.transactions
+        const txsToday = await (db as any).transactions
           .where('date')
           .aboveOrEqual(startOfDay.toISOString())
           .count();

@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -11,12 +12,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import { TransactionService } from '@/services/transactionService';
 import { db } from '@/lib/db';
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
 import { MoneyInput } from '@/components/ui/MoneyInput';
 import { MotivationalModal } from '@/components/transactions/MotivationalModal';
 import { soundService } from '@/lib/SoundService';
 import { toast } from 'sonner';
 
-export default function RegisterTransactionPage() {
+function RegisterTxContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [loading, setLoading] = useState(false);
@@ -24,6 +26,7 @@ export default function RegisterTransactionPage() {
   const [showMotivationalModal, setShowMotivationalModal] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [formErrors, setFormErrors] = useState<{ amount?: string; category?: string; date?: string; }>({});
+  const workspaceId = WorkspaceQueries.useActiveWorkspaceId();
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -73,7 +76,7 @@ export default function RegisterTransactionPage() {
       setFormErrors({});
 
       // Get first account
-      let account = await db.accounts.orderBy('id').first();
+      let account = await db.accounts.where('workspaceId').equals(workspaceId as string).first();
       
       // If no account exists (offline first setup without sync), create a default one
       if (!account) {
@@ -86,21 +89,20 @@ export default function RegisterTransactionPage() {
         }
         
         const { AccountService } = await import('@/services/accountService');
-        account = await AccountService.createAccount({
+        account = (await AccountService.createAccount({
           userId: user.id,
           name: 'Cuenta Principal',
           balance: 0,
-        });
+        })) as any;
       }
 
       await TransactionService.createTransaction({
-        userId: account.userId,
-        accountId: account.id,
-        categoryId,
+        accountId: account!.id,
+        categoryId: categoryId ? String(categoryId) : undefined,
         type,
         amount,
         date: new Date(dateStr).toISOString(),
-        notes,
+        notes: notes ? String(notes) : undefined,
       });
 
       soundService.play('success');
@@ -238,6 +240,7 @@ export default function RegisterTransactionPage() {
                 <span className="mr-2 text-2xl opacity-50">$</span>
                 <MoneyInput 
                   name="amount"
+                  autoFocus
                   placeholder="0,00" 
                   required
                   baseTextSize="text-4xl"
@@ -300,4 +303,12 @@ export default function RegisterTransactionPage() {
       )}
     </div>
   )
+}
+
+export default function RegisterTransactionPage() {
+  return (
+    <Suspense fallback={<div className="flex-1 animate-pulse bg-background" />}>
+      <RegisterTxContent />
+    </Suspense>
+  );
 }

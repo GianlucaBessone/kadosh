@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 
 export function DeveloperCard() {
   const [loading, setLoading] = useState(false);
-  const [status, setStatus] = useState<'IDLE' | 'PENDING' | 'NOTIFIED' | 'SEEN'>('IDLE');
+  const [status, setStatus] = useState<'IDLE' | 'PENDING' | 'NOTIFIED' | 'SEEN' | 'LOADING'>('LOADING');
   const user = useLiveQuery(() => db.users.orderBy('id').first());
 
   useEffect(() => {
@@ -28,9 +28,12 @@ export function DeveloperCard() {
           const data = await response.json();
           if (data.status) {
             setStatus(data.status);
+            return;
           }
         }
+        setStatus('IDLE');
       } catch (error) {
+        setStatus('IDLE');
         console.error('Error checking developer info status', error);
       }
     };
@@ -104,6 +107,10 @@ export function DeveloperCard() {
       setStatus('SEEN');
     }
   };
+
+  if (status === 'LOADING') {
+    return <div className="mt-4 h-[140px] bg-muted/30 rounded-2xl animate-pulse flex items-center justify-center"></div>;
+  }
 
   if (status === 'IDLE') {
     return (

@@ -18,13 +18,12 @@ model User {
   deletedAt DateTime?
 
   // Relations
-  accounts      Account[]
-  categories    Category[]
-  transactions  Transaction[]
-  seedGoals     SeedGoal[]
-  tithes        Tithe[]
-  notifications Notification[]
   settings      Settings?
+  notifications Notification[]
+  workspaces    WorkspaceMember[] @relation("WorkspaceMemberUser")
+  invitations   WorkspaceMember[] @relation("InvitedBy")
+  devices       Device[]
+  events        WorkspaceEvent[]
 
   supportTickets        SupportTicket[]
   feedbacks             Feedback[]
@@ -60,94 +59,129 @@ enum VerseCategory {
   ESPERANZA
 }
 
-model Account {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  name      String
-  balance   Float     @default(0)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+// ─── E2EE & Event Sourcing ─────────────────────────────
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
+model Workspace {
+  id               String   @id @default(uuid()) @db.Uuid
+  name             String
+  type             String   @default("PERSONAL") // PERSONAL, FAMILY, BUSINESS, MINISTRY
+  workspaceVersion Int      @default(1)
+  ownerId          String   @db.Uuid
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  members            WorkspaceMember[]
+  events             WorkspaceEvent[]
+  keys               WorkspaceKey[]
+  workspaceSnapshots WorkspaceSnapshot[]
 }
 
-model Category {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  name      String
-  type      String // "INCOME" | "EXPENSE"
-  icon      String?
-  color     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+model WorkspaceMember {
+  id                 String    @id @default(uuid()) @db.Uuid
+  workspaceId        String    @db.Uuid
+  userId             String    @db.Uuid
+  roleTemplate       String    @default("MEMBER") // OWNER, ADMIN, MEMBER, VIEWER, CUSTOM
+  customCapabilities Json?
+  status             String    @default("ACCEPTED") // PENDING, ACCEPTED, REJECTED, REMOVED
+  invitedById        String?   @db.Uuid
+  invitedAt          DateTime?
+  acceptedAt         DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  transactions Transaction[]
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation("WorkspaceMemberUser", fields: [userId], references: [id], onDelete: Cascade)
+  invitedBy User?     @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, userId])
 }
 
-model Transaction {
-  id         String    @id @default(uuid()) @db.Uuid
-  userId     String    @db.Uuid
-  accountId  String    @db.Uuid
-  categoryId String?   @db.Uuid
-  type       String // "INCOME" | "EXPENSE" | "TRANSFER"
-  amount     Float
-  date       DateTime  @default(now())
-  notes      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
-
-  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
-  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
-}
-
-model SeedGoal {
+model Device {
   id            String    @id @default(uuid()) @db.Uuid
   userId        String    @db.Uuid
-  name          String
-  targetAmount  Float
-  currentAmount Float     @default(0)
-  targetDate    DateTime?
-  status        String    @default("ACTIVE") // ACTIVE, HARVESTED
+  publicKey     String // Identity Public Key (Curve25519 Hex)
+  deviceName    String
+  trusted       Boolean   @default(false)
+  deviceRole    String    @default("SECONDARY") // PRIMARY, SECONDARY
+  appVersion    String?
+  cryptoVersion String?
+  lastSyncAt    DateTime?
+  lastSeen      DateTime  @default(now())
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  deletedAt     DateTime?
 
-  user          User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  contributions SeedContribution[]
+  user            User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceKeys   DeviceWorkspaceKey[]
+  workspaceEvents WorkspaceEvent[]
 }
 
-model SeedContribution {
-  id         String    @id @default(uuid()) @db.Uuid
-  seedGoalId String    @db.Uuid
-  amount     Float
-  date       DateTime  @default(now())
-  notes      String?
-  createdAt  DateTime  @default(now())
-  updatedAt  DateTime  @updatedAt
-  deletedAt  DateTime?
+model WorkspaceKey {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @db.Uuid
+  version     Int      @default(1)
+  createdAt   DateTime @default(now())
 
-  seedGoal SeedGoal @relation(fields: [seedGoalId], references: [id], onDelete: Cascade)
+  workspace          Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  deviceKeys         DeviceWorkspaceKey[]
+  events             WorkspaceEvent[]
+  workspaceSnapshots WorkspaceSnapshot[]
 }
 
-model Tithe {
-  id        String    @id @default(uuid()) @db.Uuid
-  userId    String    @db.Uuid
-  amount    Float
-  date      DateTime  @default(now())
-  month     Int
-  year      Int
-  notes     String?
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  deletedAt DateTime?
+model DeviceWorkspaceKey {
+  id             String   @id @default(uuid()) @db.Uuid
+  workspaceKeyId String   @db.Uuid
+  deviceId       String   @db.Uuid
+  wrappedKey     String // Workspace Key cifrada con la publicKey del Device
+  createdAt      DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspaceKey WorkspaceKey @relation(fields: [workspaceKeyId], references: [id], onDelete: Cascade)
+  device       Device       @relation(fields: [deviceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceKeyId, deviceId])
+}
+
+model WorkspaceEvent {
+  id          String @id @default(uuid()) @db.Uuid
+  workspaceId String @db.Uuid
+
+  // ─── Metadata ──────────────────────────────────────
+  aggregateId       String   @db.Uuid
+  aggregateType     String
+  sequence          Int
+  eventType         String // e.g. "TransactionCreated", "AccountUpdated"
+  eventVersion      String   @default("v1")
+  schemaVersion     String   @default("1.0")
+  encryptionVersion String   @default("v1")
+  ownerUserId       String   @db.Uuid
+  deviceId          String?  @db.Uuid
+  keyId             String   @db.Uuid
+  createdAt         DateTime @default(now())
+  // ───────────────────────────────────────────────────
+
+  encryptedPayload String // Cyphertext + IV en Base64
+  // Los eventos son inmutables, no hay updatedAt.
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  owner        User         @relation(fields: [ownerUserId], references: [id], onDelete: Cascade)
+  device       Device?      @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  workspaceKey WorkspaceKey @relation(fields: [keyId], references: [id], onDelete: Restrict)
+}
+
+model WorkspaceSnapshot {
+  id                String   @id @default(uuid()) @db.Uuid
+  workspaceId       String   @db.Uuid
+  snapshotVersion   Int
+  schemaVersion     String   @default("1.0")
+  lastEventId       String   @db.Uuid
+  keyId             String   @db.Uuid
+  eventCount        Int      @default(0)
+  createdByDeviceId String   @db.Uuid
+  snapshotPolicy    String   @default("AUTO") // AUTO, MANUAL
+  encryptedPayload  String
+  createdAt         DateTime @default(now())
+
+  workspace    Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceKey WorkspaceKey @relation(fields: [keyId], references: [id], onDelete: Restrict)
 }
 
 model DailyVerse {
@@ -301,4 +335,93 @@ model Admin {
   name      String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+// ─── Domain Models (Read Models / Projections) ─────────
+// Estos modelos NO se persisten en PostgreSQL mediante CRUD tradicional.
+// Se utilizan estrictamente como tipos de dominio para el Projection Engine,
+// la UI y Zustand. Su presencia en Prisma garantiza el tipado y consistencia.
+
+model Account {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  name        String
+  balance     Float     @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  transactions Transaction[]
+}
+
+model Category {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  name        String
+  type        String
+  icon        String?
+  color       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  transactions Transaction[]
+}
+
+model Transaction {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  accountId   String    @db.Uuid
+  categoryId  String?   @db.Uuid
+  type        String
+  amount      Float
+  date        DateTime  @default(now())
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+
+  account  Account   @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+}
+
+model SeedGoal {
+  id            String    @id @default(uuid()) @db.Uuid
+  workspaceId   String    @db.Uuid
+  name          String
+  targetAmount  Float
+  currentAmount Float     @default(0)
+  targetDate    DateTime?
+  status        String    @default("ACTIVE")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  deletedAt     DateTime?
+
+  contributions SeedContribution[]
+}
+
+model SeedContribution {
+  id         String    @id @default(uuid()) @db.Uuid
+  seedGoalId String    @db.Uuid
+  amount     Float
+  date       DateTime  @default(now())
+  notes      String?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime?
+
+  seedGoal SeedGoal @relation(fields: [seedGoalId], references: [id], onDelete: Cascade)
+}
+
+model Tithe {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @db.Uuid
+  amount      Float
+  date        DateTime  @default(now())
+  month       Int
+  year        Int
+  notes       String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
 }

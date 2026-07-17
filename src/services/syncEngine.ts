@@ -14,6 +14,11 @@ export class SyncEngine {
       return;
     }
 
+    if (user.isEmailConfirmed === false) {
+      console.log('Sync disabled: email not confirmed yet.');
+      return;
+    }
+
     // Only sync if user has a linked cloud account (Supabase session cookie exists)
     const hasSupabaseSession = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
     if (!hasSupabaseSession) {
@@ -67,30 +72,29 @@ export class SyncEngine {
   };
 
   private async pushChanges() {
-    // 1. Get pending items from sync queue
-    const pendingItems = await db.syncQueue
-      .where('status')
+    // 1. Get pending events
+    const pendingEvents = await db.workspaceEvents
+      .where('syncStatus')
       .anyOf(['PENDING', 'ERROR'])
       .toArray();
 
-    if (pendingItems.length === 0) return;
+    if (pendingEvents.length === 0) return;
 
     // Mark as processing
-    await db.syncQueue.bulkUpdate(
-      pendingItems.map((item) => ({ key: item.id, changes: { status: 'PROCESSING', attempts: item.attempts + 1, lastAttempt: new Date().toISOString() } }))
+    await db.workspaceEvents.bulkUpdate(
+      pendingEvents.map((item) => ({ key: item.id, changes: { syncStatus: 'PROCESSING' } }))
     );
 
     try {
       const response = await fetch('/api/sync/push', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operations: pendingItems }),
+        body: JSON.stringify({ events: pendingEvents }),
       });
 
       if (response.status === 401) {
-        // User not synced with cloud. Revert to PENDING.
-        await db.syncQueue.bulkUpdate(
-          pendingItems.map((item) => ({ key: item.id, changes: { status: 'PENDING' } }))
+        await db.workspaceEvents.bulkUpdate(
+          pendingEvents.map((item) => ({ key: item.id, changes: { syncStatus: 'PENDING' } }))
         );
         return;
       }
@@ -99,14 +103,13 @@ export class SyncEngine {
         throw new Error('Push failed');
       }
 
-      // Mark as synced (delete or update status)
-      // Usually it's better to just delete synced items to keep the queue small
-      const idsToDelete = pendingItems.map((i) => i.id);
-      await db.syncQueue.bulkDelete(idsToDelete);
+      // Mark as synced
+      await db.workspaceEvents.bulkUpdate(
+        pendingEvents.map((item) => ({ key: item.id, changes: { syncStatus: 'SYNCED' } }))
+      );
     } catch (error) {
-      // Revert to error status
-      await db.syncQueue.bulkUpdate(
-        pendingItems.map((item) => ({ key: item.id, changes: { status: 'ERROR' } }))
+      await db.workspaceEvents.bulkUpdate(
+        pendingEvents.map((item) => ({ key: item.id, changes: { syncStatus: 'ERROR' } }))
       );
       throw error;
     }
@@ -135,80 +138,54 @@ export class SyncEngine {
     const data = await response.json();
     const serverTimestamp = data.serverTimestamp;
     
-    // Process incoming data (Last Write Wins)
-    await db.transaction('rw', [db.transactions, db.categories, db.accounts, db.seedGoals, db.seedContributions, db.tithes, db.settings, db.notifications, db.financialCommitments, db.commitmentPayments], async () => {
-      // Transactions
-      for (const t of data.transactions || []) {
-        const existing = await db.transactions.get(t.id);
-        if (!existing || new Date(t.updatedAt) > new Date(existing.updatedAt)) {
-          await db.transactions.put(t);
+    // Process incoming events
+    await db.transaction('rw', [
+      db.workspaceEvents, db.workspaceSnapshots, db.workspaceKeys, 
+      db.deviceWorkspaceKeys, db.settings, db.notifications
+    ], async () => {
+      // Eventos
+      for (const e of data.workspaceEvents || []) {
+        const existing = await db.workspaceEvents.get(e.id);
+        if (!existing) {
+          await db.workspaceEvents.put({ ...e, syncStatus: 'SYNCED' });
         }
       }
 
-      // Categories
-      for (const c of data.categories || []) {
-        const existing = await db.categories.get(c.id);
-        if (!existing || new Date(c.updatedAt) > new Date(existing.updatedAt)) {
-          await db.categories.put(c);
+      // Snapshots
+      for (const snap of data.workspaceSnapshots || []) {
+        const existing = await db.workspaceSnapshots.get(snap.id);
+        if (!existing) {
+          await db.workspaceSnapshots.put(snap);
         }
       }
 
-      // Accounts
-      for (const a of data.accounts || []) {
-        const existing = await db.accounts.get(a.id);
-        if (!existing || new Date(a.updatedAt) > new Date(existing.updatedAt)) {
-          await db.accounts.put(a);
+      // Llaves del Workspace
+      for (const wk of data.workspaceKeys || []) {
+        const existing = await db.workspaceKeys.get(wk.id);
+        if (!existing) {
+          await db.workspaceKeys.put(wk);
         }
       }
 
-      // SeedGoals
-      for (const s of data.seedGoals || []) {
-        const existing = await db.seedGoals.get(s.id);
-        if (!existing || new Date(s.updatedAt) > new Date(existing.updatedAt)) {
-          await db.seedGoals.put(s);
-        }
-      }
-      
-      // SeedContributions
-      for (const sc of data.seedContributions || []) {
-        const existing = await db.seedContributions.get(sc.id);
-        if (!existing || new Date(sc.updatedAt) > new Date(existing.updatedAt)) {
-          await db.seedContributions.put(sc);
+      // Mis llaves cifradas (DeviceWorkspaceKey)
+      for (const dwk of data.deviceWorkspaceKeys || []) {
+        const existing = await db.deviceWorkspaceKeys.get(dwk.id);
+        if (!existing) {
+          await db.deviceWorkspaceKeys.put(dwk);
         }
       }
 
-      // Tithes
-      for (const t of data.tithes || []) {
-        const existing = await db.tithes.get(t.id);
-        if (!existing || new Date(t.updatedAt) > new Date(existing.updatedAt)) {
-          await db.tithes.put(t);
-        }
-      }
-
-      // Settings
+      // Settings (Non-financial, LWW)
       for (const s of data.settings || []) {
         const existing = await db.settings.get(s.id);
         if (!existing || new Date(s.updatedAt) > new Date(existing.updatedAt)) {
           await db.settings.put(s);
         }
       }
-
-      // Financial Commitments
-      for (const fc of data.financialCommitments || []) {
-        const existing = await db.financialCommitments.get(fc.id);
-        if (!existing || new Date(fc.updatedAt) > new Date(existing.updatedAt)) {
-          await db.financialCommitments.put(fc);
-        }
-      }
-
-      // Commitment Payments
-      for (const cp of data.commitmentPayments || []) {
-        const existing = await db.commitmentPayments.get(cp.id);
-        if (!existing || new Date(cp.updatedAt) > new Date(existing.updatedAt)) {
-          await db.commitmentPayments.put(cp);
-        }
-      }
     });
+
+    // Notify state reducer that new events arrived
+    window.dispatchEvent(new CustomEvent('workspace-events-updated'));
 
     // Update last sync time
     await db.metadata.update('sync-metadata', { lastSyncAt: serverTimestamp });

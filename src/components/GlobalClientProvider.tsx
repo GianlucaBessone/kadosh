@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { syncEngine } from '@/services/syncEngine';
 import { isAppUnlocked, hasLocalPin } from '@/features/auth/localAuth';
 import { useRouter, usePathname } from 'next/navigation';
@@ -9,6 +9,9 @@ import { db } from '@/lib/db';
 
 import { DailyVerseService } from '@/features/daily-verse/service';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { Profiler } from 'react';
+import { onRenderCallback } from '@/lib/performance/ReactRenderProfiler';
+import { NavigationProfiler } from '@/lib/performance/NavigationProfiler';
 import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { soundService } from '@/lib/SoundService';
 import { Toaster } from '@/components/ui/sonner';
@@ -19,6 +22,16 @@ const PUBLIC_ROUTES = new Set(['/', '/login', '/registro', '/welcome']);
 function isPublicPath(pathname: string | null) {
   if (!pathname) return false;
   return PUBLIC_ROUTES.has(pathname) || pathname.startsWith('/admin');
+}
+
+// Patch for Radix UI releasePointerCapture bug in React 18
+if (typeof window !== 'undefined') {
+  const originalReleasePointerCapture = Element.prototype.releasePointerCapture;
+  Element.prototype.releasePointerCapture = function(pointerId) {
+    if (this.hasPointerCapture(pointerId)) {
+      originalReleasePointerCapture.call(this, pointerId);
+    }
+  };
 }
 
 /**
@@ -37,7 +50,7 @@ function ThemeApplier() {
   return null;
 }
 
-export function GlobalClientProvider({ children }: { children: React.ReactNode }) {
+function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const isMounted = useRef(false);
@@ -49,19 +62,6 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     isMounted.current = true;
-
-    // Start the offline sync engine
-    syncEngine.start();
-
-    // Init Daily Verses
-    DailyVerseService.initializeDatabase();
-    
-    // Init SoundService configuration
-    soundService.reloadSettings();
-
-    return () => {
-      syncEngine.stop();
-    };
   }, []);
 
   useEffect(() => {
@@ -74,7 +74,6 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
         router.replace('/home');
         return;
       }
-
       markAuthVerified();
       return;
     }
@@ -89,21 +88,92 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
       return;
     }
 
-    markAuthVerified();
+    db.users.orderBy('id').first().then(async user => {
+      if (user) {
+        const existingWs = await db.workspaces.get(user.id);
+        if (!existingWs) {
+          await db.workspaces.put({
+            id: user.id,
+            name: 'Personal',
+            type: 'PERSONAL',
+            ownerId: user.id,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        try {
+          const { SnapshotManager } = await import('@/lib/crypto/SnapshotManager');
+          await SnapshotManager.loadWorkspace(user.id);
+        } catch (error) {
+          console.error("Failed to load workspace", error);
+          const { useWorkspaceStore } = await import('@/store/WorkspaceStore');
+          useWorkspaceStore.getState().initializeWorkspace(user.id);
+          useWorkspaceStore.getState().setActiveWorkspace(user.id);
+        }
+
+        try {
+          const { ProjectionRecoveryManager } = await import('@/lib/crypto/ProjectionRecoveryManager');
+          await ProjectionRecoveryManager.triggerRecovery('Workspace Loaded');
+        } catch (e) {
+          console.error('Failed to run initial projections', e);
+        }
+      }
+      markAuthVerified();
+    });
   }, [markAuthVerified, pathname, router]);
 
-  // Don't render children until we've verified auth on the client to prevent flickering.
   if (typeof window === 'undefined' || !isAuthVerified) return null;
 
-  const publicRoute = isPublicPath(pathname);
+  return <>{children}</>;
+}
+
+function OnboardingWrapper() {
+  const pathname = usePathname();
+  if (pathname === '/welcome') return null;
+  return <OnboardingModal />;
+}
+
+export function GlobalClientProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    // Start Projection Engine (Reactive Loop for Event Sourcing)
+    import('@/lib/crypto/ProjectionRecoveryManager').then(({ ProjectionRecoveryManager }) => {
+      ProjectionRecoveryManager.init();
+      ProjectionRecoveryManager.triggerRecovery('App Startup');
+    });
+
+    // Check and claim workspace before starting sync engine
+    import('@/services/WorkspaceAssociationService').then(({ WorkspaceAssociationService }) => {
+      WorkspaceAssociationService.checkAndClaimWorkspace().finally(() => {
+        syncEngine.start();
+      });
+    });
+
+    // Init Daily Verses
+    DailyVerseService.initializeDatabase();
+    
+    // Init SoundService configuration
+    soundService.reloadSettings();
+
+    return () => {
+      syncEngine.stop();
+    };
+  }, []);
 
   return (
-    <TooltipProvider>
-      <ThemeApplier />
-      <GlobalDevInfoWatcher />
-      {pathname !== '/welcome' && <OnboardingModal />}
-      {children}
-      <Toaster />
-    </TooltipProvider>
+    <Profiler id="GlobalClientProvider" onRender={onRenderCallback}>
+      <TooltipProvider>
+        <Suspense fallback={null}>
+          <NavigationProfiler />
+        </Suspense>
+        <ThemeApplier />
+        <GlobalDevInfoWatcher />
+        <AuthGuard>
+          <OnboardingWrapper />
+          {children}
+        </AuthGuard>
+        <Toaster />
+      </TooltipProvider>
+    </Profiler>
   );
 }

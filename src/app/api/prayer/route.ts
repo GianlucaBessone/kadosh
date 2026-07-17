@@ -28,10 +28,11 @@ export async function POST(req: Request) {
     });
 
     if (recentPrayer) {
-      return NextResponse.json(
-        { success: false, message: 'Ya registramos tu oración en los últimos 30 días. ¡Muchas gracias!' },
-        { status: 429 }
-      );
+      return NextResponse.json({ 
+        success: true, 
+        alreadyPrayed: true,
+        message: 'Ya registramos tu oración en los últimos 30 días. ¡Muchas gracias!' 
+      });
     }
 
     const prayer = await prisma.prayer.create({

@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ArrowDownIcon, ArrowUpIcon, Droplet, HandHeart } from 'lucide-react';
 import Link from 'next/link';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
 import { formatMoney, formatMoneyCompact, cn } from '@/lib/utils';
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { DailyVerseCard } from '@/features/daily-verse/components/DailyVerseCard';
@@ -41,21 +42,21 @@ export default function HomePage() {
     return () => window.removeEventListener('click', handleGlobalClick);
   }, []);
 
-  const accounts = useLiveQuery(() => db.accounts.toArray()) || [];
+  const accounts = WorkspaceQueries.useAccounts();
   const totalBalance = accounts.reduce((acc, account) => acc + account.balance, 0);
 
   // We could also calculate incomes and expenses for the current month.
   // Fetch transactions and tithes to show in recent movements
-  const transactions = useLiveQuery(async () => {
-    const txs = await db.transactions.toArray();
-    const tithes = await db.tithes.toArray();
-    
+  const allTransactions = WorkspaceQueries.useTransactions();
+  const tithes = WorkspaceQueries.useTithes();
+  
+  const transactions = useMemo(() => {
     const mappedTithes = tithes.map(t => ({
       id: t.id,
       userId: t.userId,
       accountId: '',
       categoryId: 'tithe',
-      type: 'EXPENSE',
+      type: 'EXPENSE' as const,
       amount: t.amount,
       date: t.date,
       notes: t.notes || 'Entrega de Diezmo',
@@ -64,61 +65,53 @@ export default function HomePage() {
       deletedAt: t.deletedAt
     }));
 
-    const all = [...txs, ...mappedTithes];
-    return all.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()).slice(0, 5);
-  }) || [];
+    const all = [...allTransactions, ...mappedTithes];
+    return all.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5);
+  }, [tithes, allTransactions]);
   
   // Calculate current month's stats (approximation)
   const currentMonthStart = new Date();
   currentMonthStart.setDate(1);
   currentMonthStart.setHours(0, 0, 0, 0);
   
-  const settingsQuery = useLiveQuery(() => db.settings.orderBy('id').first(), [], 'LOADING' as any) as any;
+  const workspace = WorkspaceQueries.useActiveWorkspace();
+  const settingsQuery = useLiveQuery(() => db.settings.orderBy('id').first());
 
-  const currentMonthTx = useLiveQuery(() => 
-    db.transactions.where('date').aboveOrEqual(currentMonthStart.toISOString()).toArray()
-  ) || [];
+  const currentMonthTx = useMemo(() => allTransactions.filter(tx => tx.date >= currentMonthStart.toISOString()), [allTransactions, currentMonthStart]);
 
-  const filteredTx = currentMonthTx.filter(tx => {
+  const filteredTx = useMemo(() => currentMonthTx.filter(tx => {
     if (selectedPeriod === 'MONTH') return true;
     const txDate = new Date(tx.date);
     const day = txDate.getDate();
     return selectedPeriod === 'Q1' ? (day >= 1 && day <= 15) : (day >= 16);
-  });
+  }), [currentMonthTx, selectedPeriod]);
 
-  const incomes = filteredTx.filter(t => t.type === 'INCOME' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
-  const expenses = filteredTx.filter(t => t.type === 'EXPENSE' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0);
+  const incomes = useMemo(() => filteredTx.filter(t => t.type === 'INCOME' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0), [filteredTx]);
+  const expenses = useMemo(() => filteredTx.filter(t => t.type === 'EXPENSE' && t.categoryId !== 'seed_transfer').reduce((acc, t) => acc + t.amount, 0), [filteredTx]);
 
-  const activeSeedsCount = useLiveQuery(() => 
-    db.seedGoals
-      .filter(seed => seed.status === 'ACTIVE' && !seed.deletedAt)
-      .count()
-  ) || 0;
+  const allSeeds = WorkspaceQueries.useSeeds();
+  const activeSeedsCount = allSeeds.filter(seed => seed.status === 'ACTIVE' && !seed.deletedAt).length;
 
-  const user = useLiveQuery(() => db.users.orderBy('id').first());
-  const userName = user?.name ? user.name.split(' ')[0] : 'Usuario';
+  const userName = 'Usuario';
 
   const currentMonthVal = currentMonthStart.getMonth() + 1;
   const currentYearVal = currentMonthStart.getFullYear();
-  const tithesThisMonth = useLiveQuery(() => {
-    if (!user?.id) return [];
-    return db.tithes.where('[month+year]').equals([currentMonthVal, currentYearVal]).filter(t => t.userId === user.id).toArray();
-  }, [user?.id, currentMonthVal, currentYearVal]) || [];
+  const tithesThisMonth = useMemo(() => tithes.filter(t => t.month === currentMonthVal && t.year === currentYearVal), [tithes, currentMonthVal, currentYearVal]);
 
-  const filteredTithes = tithesThisMonth.filter(t => {
+  const filteredTithes = useMemo(() => tithesThisMonth.filter(t => {
     if (selectedPeriod === 'MONTH') return true;
     const tDate = new Date(t.date);
     const day = tDate.getDate();
     return selectedPeriod === 'Q1' ? (day >= 1 && day <= 15) : (day >= 16);
-  });
+  }), [tithesThisMonth, selectedPeriod]);
 
-  const totalPaidTithe = filteredTithes.reduce((acc, t) => acc + t.amount, 0);
+  const totalPaidTithe = useMemo(() => filteredTithes.reduce((acc, t) => acc + t.amount, 0), [filteredTithes]);
   const suggestedTithe = titheAmt !== null ? titheAmt : (incomes * (tithePct / 100));
   const pendingTithe = Math.max(0, suggestedTithe - totalPaidTithe);
 
   // Next upcoming commitment
-  const nextCommitmentData = useLiveQuery<{ commitment: FinancialCommitment; dueDate: Date } | null>(async () => {
-    if (!user?.id) return null;
+  const allCommitments = WorkspaceQueries.useCommitments();
+  const nextCommitmentData = useMemo<{ commitment: FinancialCommitment; dueDate: Date } | null>(() => {
     const now = new Date();
     const month = now.getMonth() + 1;
     const year = now.getFullYear();
@@ -126,13 +119,10 @@ export default function HomePage() {
       { m: month, y: year },
       { m: month === 12 ? 1 : month + 1, y: month === 12 ? year + 1 : year },
     ];
-    const all = await db.financialCommitments
-      .where('ownerId').equals(user.id)
-      .filter(c => c.deletedAt === null && c.status === 'ACTIVE')
-      .toArray();
+    const activeCommitments = allCommitments.filter(c => c.deletedAt === null && c.status === 'ACTIVE');
     let best: { commitment: FinancialCommitment; dueDate: Date } | null = null;
     for (const { m, y } of searchMonths) {
-      for (const c of all) {
+      for (const c of activeCommitments) {
         const generated = generateInstallmentsForMonth(c, m, y);
         for (const inst of generated) {
           if (inst.dueDate < now) continue;
@@ -144,7 +134,7 @@ export default function HomePage() {
       if (best) break;
     }
     return best;
-  }, [user?.id]);
+  }, [allCommitments]);
 
   if (!isMounted) return null;
 
@@ -310,9 +300,9 @@ export default function HomePage() {
           ))}
         </div>
       </div>
-      {settingsQuery !== 'LOADING' && (!settingsQuery || !settingsQuery.hasSelectedPlanningMode) && (
+      {settingsQuery !== undefined && (!settingsQuery || !settingsQuery.hasSelectedPlanningMode) && (
         <PlanningModeModal 
-          settings={settingsQuery === 'LOADING' ? undefined : settingsQuery} 
+          settings={settingsQuery} 
           onComplete={() => {
             // forces re-render if needed, but Dexie hook will update
           }} 

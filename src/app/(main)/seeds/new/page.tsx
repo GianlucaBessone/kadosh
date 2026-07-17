@@ -55,9 +55,6 @@ export default function NewSeedPage() {
         userId: user.id,
         name,
         targetAmount,
-        currentAmount: 0,
-        status: 'ACTIVE',
-        targetDate: null
       });
       
       soundService.play('success');

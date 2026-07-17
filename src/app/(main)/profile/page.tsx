@@ -1,9 +1,11 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
+import { toast } from 'sonner';
 import {
   User, Moon, Bell, Download, LogOut, BookOpen,
-  Camera, Mail, Sun, ChevronRight, Loader2, CalendarDays, Volume2
+  Camera, Mail, Sun, ChevronRight, Loader2, CalendarDays, Volume2, ShieldCheck,
+  CheckCircle2, Circle, AlertCircle
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -18,10 +20,11 @@ import {
 } from '@/components/ui/tooltip';
 import { lockApp } from '@/features/auth/localAuth';
 import { useRouter } from 'next/navigation';
-import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
 import { useTheme } from '@/lib/useTheme';
 import { ExportModal } from '@/components/transactions/ExportModal';
+import { useLiveQuery } from 'dexie-react-hooks';
 
 // ─── Avatar Upload ────────────────────────────────────────────────────────────
 
@@ -105,26 +108,69 @@ function AssociateAccountBanner({ userId }: { userId: string }) {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const hasLength = password.length >= 8;
+  const hasUpper = /[A-Z]/.test(password);
+  const hasLower = /[a-z]/.test(password);
+  const hasNumber = /[0-9]/.test(password);
+  const isPasswordValid = hasLength && hasUpper && hasLower && hasNumber;
 
   const handleAssociate = async () => {
     setError(null);
     setLoading(true);
     try {
-      // Lazy-import Supabase client to keep this offline-friendly
       const { createClient } = await import('@/utils/supabase/client');
       const supabase = createClient();
 
-      const { error: signUpError } = await supabase.auth.signUp({ email, password });
+      const { error: signUpError } = await supabase.auth.signUp({ 
+        email, 
+        password,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
       if (signUpError) throw signUpError;
 
       await db.users.update(userId, {
         email,
         isCloudLinked: true,
+        isEmailConfirmed: false,
         updatedAt: new Date().toISOString(),
       });
-      setOpen(false);
+      setSuccess(true);
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Error al asociar la cuenta.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    setLoading(true);
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { error } = await supabase.auth.resend({ 
+        type: 'signup', 
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      if (error) {
+        if (error.message.toLowerCase().includes('already verified')) {
+          await db.users.update(userId, { isEmailConfirmed: true, updatedAt: new Date().toISOString() });
+          toast.success('Tu cuenta ya fue verificada exitosamente.');
+          setSuccess(false);
+          setOpen(false);
+          return;
+        }
+        throw error;
+      }
+      toast.success('Correo reenviado exitosamente. Revisa tu bandeja de entrada y SPAM.');
+    } catch (err) {
+      toast.error('Error al reenviar el correo.');
     } finally {
       setLoading(false);
     }
@@ -161,48 +207,86 @@ function AssociateAccountBanner({ userId }: { userId: string }) {
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="rounded-3xl">
-          <DialogHeader>
-            <DialogTitle>Asociar cuenta de correo</DialogTitle>
-            <DialogDescription>
-              Crea una cuenta en la nube para sincronizar y respaldar tus datos.
-            </DialogDescription>
-          </DialogHeader>
+          {!success ? (
+            <>
+              <DialogHeader>
+                <DialogTitle>Asociar cuenta de correo</DialogTitle>
+                <DialogDescription>
+                  Crea una cuenta en la nube para sincronizar y respaldar tus datos.
+                </DialogDescription>
+              </DialogHeader>
 
-          <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label htmlFor="assoc-email">Correo electrónico</Label>
-              <Input
-                id="assoc-email"
-                type="email"
-                placeholder="tu@correo.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="assoc-password">Contraseña</Label>
-              <Input
-                id="assoc-password"
-                type="password"
-                placeholder="Mínimo 8 caracteres"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-            </div>
-            {error && (
-              <p className="text-sm text-destructive">{error}</p>
-            )}
-          </div>
+              <div className="space-y-3 py-2">
+                <div className="space-y-1">
+                  <Label htmlFor="assoc-email">Correo electrónico</Label>
+                  <Input
+                    id="assoc-email"
+                    type="email"
+                    placeholder="tu@correo.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="assoc-password">Contraseña</Label>
+                  <Input
+                    id="assoc-password"
+                    type="password"
+                    placeholder="Contraseña segura"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                  <div className="flex flex-col gap-1 mt-2 text-xs">
+                    <div className={`flex items-center gap-1 ${hasLength ? 'text-success' : 'text-muted-foreground'}`}>
+                      {hasLength ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} Mínimo 8 caracteres
+                    </div>
+                    <div className={`flex items-center gap-1 ${hasUpper ? 'text-success' : 'text-muted-foreground'}`}>
+                      {hasUpper ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} Al menos 1 mayúscula
+                    </div>
+                    <div className={`flex items-center gap-1 ${hasLower ? 'text-success' : 'text-muted-foreground'}`}>
+                      {hasLower ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} Al menos 1 minúscula
+                    </div>
+                    <div className={`flex items-center gap-1 ${hasNumber ? 'text-success' : 'text-muted-foreground'}`}>
+                      {hasNumber ? <CheckCircle2 className="w-3 h-3" /> : <Circle className="w-3 h-3" />} Al menos 1 número
+                    </div>
+                  </div>
+                </div>
+                {error && (
+                  <p className="text-sm text-destructive">{error}</p>
+                )}
+              </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
-              Cancelar
-            </Button>
-            <Button id="confirm-associate-btn" onClick={handleAssociate} disabled={loading || !email || !password}>
-              {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-              Crear cuenta
-            </Button>
-          </DialogFooter>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setOpen(false)} disabled={loading}>
+                  Cancelar
+                </Button>
+                <Button id="confirm-associate-btn" onClick={handleAssociate} disabled={loading || !email || !isPasswordValid}>
+                  {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Crear cuenta
+                </Button>
+              </DialogFooter>
+            </>
+          ) : (
+            <div className="flex flex-col items-center text-center space-y-4 py-4">
+              <div className="bg-success/20 p-4 rounded-full text-success">
+                <CheckCircle2 className="w-12 h-12" />
+              </div>
+              <h2 className="text-xl font-bold">¡Revisa tu correo!</h2>
+              <p className="text-sm text-muted-foreground">
+                Te enviamos un enlace a <strong>{email}</strong> para confirmar tu cuenta.
+                Si no lo encuentras, revisa tu carpeta de SPAM o correo no deseado.
+              </p>
+              <div className="flex flex-col gap-2 w-full pt-4">
+                <Button variant="default" onClick={() => setOpen(false)} className="rounded-xl w-full">
+                  Entendido, ya cierro
+                </Button>
+                <Button variant="outline" onClick={handleResend} disabled={loading} className="rounded-xl w-full">
+                  {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                  Reenviar correo
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
@@ -214,8 +298,66 @@ function AssociateAccountBanner({ userId }: { userId: string }) {
 export default function ProfilePage() {
   const router = useRouter();
   const user = useLiveQuery(() => db.users.orderBy('id').first());
-  const settings = useLiveQuery(() => db.settings.orderBy('id').first());
+  const workspace = WorkspaceQueries.useActiveWorkspace();
+  const settings = workspace?.settings as any;
   const { isDark, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout;
+
+    async function checkConfirmation() {
+      if (user?.isCloudLinked && !user.isEmailConfirmed) {
+        try {
+          const { createClient } = await import('@/utils/supabase/client');
+          const supabase = createClient();
+          const { data: { user: supaUser } } = await supabase.auth.getUser();
+          if (supaUser?.email_confirmed_at) {
+            await db.users.update(user.id, { isEmailConfirmed: true, updatedAt: new Date().toISOString() });
+            // Start sync engine now that email is confirmed
+            const { syncEngine } = await import('@/services/syncEngine');
+            syncEngine.start();
+          }
+        } catch (e) {
+          console.error('Error checking confirmation', e);
+        }
+      }
+    }
+
+    if (user?.isCloudLinked && !user.isEmailConfirmed) {
+      checkConfirmation(); // Initial check
+      intervalId = setInterval(checkConfirmation, 5000); // Poll every 5 seconds
+    }
+
+    return () => {
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user?.isCloudLinked, user?.isEmailConfirmed, user?.id]);
+
+  const handleResendConfirmation = async () => {
+    if (!user?.email) return;
+    try {
+      const { createClient } = await import('@/utils/supabase/client');
+      const supabase = createClient();
+      const { error } = await supabase.auth.resend({ 
+        type: 'signup', 
+        email: user.email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`
+        }
+      });
+      if (error) {
+        if (error.message.toLowerCase().includes('already verified')) {
+          await db.users.update(user.id, { isEmailConfirmed: true, updatedAt: new Date().toISOString() });
+          toast.success('Tu cuenta ya estaba verificada. ¡Sincronización activada!');
+          return;
+        }
+        throw error;
+      }
+      toast.success('Correo reenviado exitosamente. Revisa tu bandeja de entrada y SPAM.');
+    } catch (err: any) {
+      toast.error(err.message || 'Error al reenviar el correo.');
+    }
+  };
 
   const handleLogout = () => {
     lockApp();
@@ -261,10 +403,51 @@ export default function ProfilePage() {
       {/* ── Avatar ─────────────────────────────────────────────────────── */}
       {user && <AvatarSection user={user} />}
 
-      {/* ── Associate account banner (shown when not cloud-linked) ─────── */}
-      {user && !user.isCloudLinked && (
-        <AssociateAccountBanner userId={user.id} />
+      {/* ── Pending Confirmation Banner ─────── */}
+      {user && user.isCloudLinked && !user.isEmailConfirmed && (
+        <Card className="rounded-3xl border-warning/40 bg-warning/10 shadow-none">
+          <CardContent className="p-4 flex flex-col gap-3">
+            <div className="flex items-center gap-3">
+              <div className="bg-warning/20 p-2 rounded-full text-warning shrink-0">
+                <AlertCircle className="w-5 h-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground flex items-center gap-1">
+                  Cuenta aún no confirmada
+                </p>
+                <p className="text-xs text-muted-foreground leading-tight">
+                  Revisa tu correo para verificar tu cuenta y activar la sincronización.
+                </p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={handleResendConfirmation} className="w-full rounded-xl border-warning/30 text-warning hover:bg-warning/20">
+              Reenviar confirmación
+            </Button>
+          </CardContent>
+        </Card>
       )}
+
+      {/* ── Cloud Sync Status ─────── */}
+      {user && !user.isCloudLinked ? (
+        <AssociateAccountBanner userId={user.id} />
+      ) : user && user.isCloudLinked && user.isEmailConfirmed ? (
+        <Card className="rounded-3xl border-success/30 bg-success/5 shadow-none overflow-hidden relative">
+          <div className="absolute top-0 left-0 w-1 h-full bg-success"></div>
+          <CardContent className="p-4 flex items-center gap-3">
+            <div className="bg-success/20 p-2 rounded-full text-success shrink-0">
+              <ShieldCheck className="w-5 h-5" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-foreground flex items-center gap-1">
+                Sincronización Segura Activada
+              </p>
+              <p className="text-xs text-muted-foreground leading-tight">
+                Tus datos tienen cifrado de extremo a extremo (E2EE)
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       {/* ── Configuración ──────────────────────────────────────────────── */}
       <div className="space-y-4">

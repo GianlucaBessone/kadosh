@@ -2,14 +2,15 @@
 
 import { ArrowLeft, Droplet, Sprout, Check, History, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
+import { useLiveQuery } from 'dexie-react-hooks'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { useLiveQuery } from 'dexie-react-hooks'
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries'
 import { db } from '@/lib/db'
 import { SeedService } from '@/services/seedService'
 import { formatMoney, cn } from '@/lib/utils'
@@ -28,14 +29,15 @@ export default function SeedDetailPage() {
   const [waterError, setWaterError] = useState<string | null>(null);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
 
-  const seed = useLiveQuery(() => db.seedGoals.get(id));
+  const seeds = WorkspaceQueries.useSeeds();
+  const seed = seeds.find(s => s.id === id);
 
   const history = useLiveQuery(async () => {
+    if (!id) return [];
     const contributions = await db.seedContributions
       .where('seedGoalId')
       .equals(id)
       .toArray();
-    
     return contributions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   }, [id]) || [];
 

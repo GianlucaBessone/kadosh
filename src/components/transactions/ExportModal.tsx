@@ -7,6 +7,7 @@ import { formatMoney } from '@/lib/utils';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import { useWorkspaceStore } from '@/store/WorkspaceStore';
 
 const CATEGORIES = [
   { id: 'supermarket', label: 'Supermercado' },
@@ -104,10 +105,13 @@ export function ExportModal({ onClose }: ExportModalProps) {
   };
 
   const fetchAndFilterData = async (bypassFiltersMode?: QuickReportMode) => {
-    const txs = await db.transactions.toArray();
-    const tithes = await db.tithes.toArray();
+    const workspaceId = useWorkspaceStore.getState().activeWorkspaceId;
+    if (!workspaceId) return [];
+
+    const txs = await (db as any).transactions.where('workspaceId').equals(workspaceId).toArray();
+    const tithes = await (db as any).tithes.where('workspaceId').equals(workspaceId).toArray();
     
-    const mappedTithes = tithes.map(t => ({
+    const mappedTithes = tithes.map((t: any) => ({
       id: t.id,
       userId: t.userId,
       accountId: '',

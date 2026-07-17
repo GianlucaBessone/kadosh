@@ -1,42 +1,64 @@
-import { db, Account } from '@/lib/db';
 import { v4 as uuidv4 } from 'uuid';
-import { addToSyncQueue } from './syncQueueService';
+import { useWorkspaceStore } from '@/store/WorkspaceStore';
+import { FinanceCommandDispatcher } from '@/domain/commands/FinanceCommandDispatcher';
+import { CreateAccountCommand, UpdateAccountCommand, DeleteAccountCommand, CommandMetadata } from '@/domain/commands/FinanceCommands';
 
 export class AccountService {
-  static async createAccount(data: Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>) {
-    const id = uuidv4();
-    const now = new Date().toISOString();
-    const account: Account = {
-      ...data,
-      id,
-      createdAt: now,
-      updatedAt: now,
-      deletedAt: null,
+  private static getMetadata(): CommandMetadata {
+    const state = useWorkspaceStore.getState();
+    const workspaceId = state.activeWorkspaceId;
+    if (!workspaceId) throw new Error('No active workspace');
+    
+    return {
+      workspaceId,
+      userId: 'local-user', // Should be fetched from auth context
+      deviceId: 'local-device', // Should be fetched from device context
+      timestamp: new Date().toISOString()
     };
-
-    await db.transaction('rw', db.accounts, db.syncQueue, async () => {
-      await db.accounts.add(account);
-      await addToSyncQueue('Account', id, 'INSERT', account);
-    });
-
-    return account;
   }
 
-  static async updateAccount(id: string, data: Partial<Omit<Account, 'id' | 'createdAt' | 'updatedAt' | 'deletedAt'>>) {
-    const now = new Date().toISOString();
-    const updateData = { ...data, updatedAt: now };
+  static async createAccount(data: { name: string; balance?: number; type?: string; currency?: string; userId?: string }) {
+    const accountId = uuidv4();
+    const command: CreateAccountCommand = {
+      type: 'CREATE_ACCOUNT',
+      metadata: this.getMetadata(),
+      payload: {
+        accountId,
+        name: data.name,
+        currency: data.currency || 'USD',
+        initialBalance: data.balance || 0,
+        type: data.type || 'CASH'
+      }
+    };
 
-    await db.transaction('rw', db.accounts, db.syncQueue, async () => {
-      await db.accounts.update(id, updateData);
-      await addToSyncQueue('Account', id, 'UPDATE', updateData);
-    });
+    await FinanceCommandDispatcher.dispatch(command);
+    
+    // Return mock account for backward compatibility if needed, or rely on UI updating via store
+    return { id: accountId, ...data };
+  }
+
+  static async updateAccount(id: string, data: { name?: string; currency?: string }) {
+    const command: UpdateAccountCommand = {
+      type: 'UPDATE_ACCOUNT',
+      metadata: this.getMetadata(),
+      payload: {
+        accountId: id,
+        ...data
+      }
+    };
+
+    await FinanceCommandDispatcher.dispatch(command);
   }
 
   static async deleteAccount(id: string) {
-    const now = new Date().toISOString();
-    await db.transaction('rw', db.accounts, db.syncQueue, async () => {
-      await db.accounts.update(id, { deletedAt: now, updatedAt: now });
-      await addToSyncQueue('Account', id, 'DELETE', { deletedAt: now, updatedAt: now });
-    });
+    const command: DeleteAccountCommand = {
+      type: 'DELETE_ACCOUNT',
+      metadata: this.getMetadata(),
+      payload: {
+        accountId: id
+      }
+    };
+
+    await FinanceCommandDispatcher.dispatch(command);
   }
 }

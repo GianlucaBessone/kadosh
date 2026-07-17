@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { Leaf, ScanFace, Delete } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { hasLocalPin, setLocalPin, verifyLocalPin, clearLocalAuth, isBiometricsSupported, hasBiometricsEnrolled, setupBiometrics, verifyBiometrics } from '@/features/auth/localAuth';
@@ -11,7 +11,7 @@ import { db, User, clearAllUserData } from '@/lib/db';
 
 type AuthState = 'LOADING' | 'LOGIN' | 'SETUP_PIN_1' | 'SETUP_PIN_2' | 'BIOMETRIC_PROMPT' | 'SYNC_PROMPT' | 'REMOVE_USER_PIN';
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [authState, setAuthState] = useState<AuthState>('LOADING');
@@ -93,6 +93,22 @@ export default function LoginPage() {
         });
         
         const { AccountService } = await import('@/services/accountService');
+        const { useWorkspaceStore } = await import('@/store/WorkspaceStore');
+        
+        // Crear el Workspace en Dexie para que ProjectionEngine pueda proyectar eventos
+        await db.workspaces.put({
+          id: userId,
+          name: 'Personal',
+          type: 'PERSONAL',
+          ownerId: userId,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
+        
+        // Inicializar y activar el workspace antes de crear cuentas
+        useWorkspaceStore.getState().initializeWorkspace(userId);
+        useWorkspaceStore.getState().setActiveWorkspace(userId);
+        
         await AccountService.createAccount({
           userId,
           name: 'Cuenta Principal',
@@ -431,5 +447,13 @@ export default function LoginPage() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-background" />}>
+      <LoginContent />
+    </Suspense>
   );
 }

@@ -43,6 +43,8 @@ export function MoneyInput({
     ? parseFloat(displayValue.replace(/\./g, '').replace(',', '.'))
     : null;
 
+  const inputRef = React.useRef<HTMLInputElement>(null);
+
   useEffect(() => {
     if (value !== undefined) {
       const formatted = formatInitial(value);
@@ -51,6 +53,18 @@ export function MoneyInput({
       }
     }
   }, [value]);
+
+  useEffect(() => {
+    const form = inputRef.current?.closest('form');
+    if (!form) return;
+
+    const handleReset = () => {
+      setDisplayValue(formatInitial(defaultValue));
+    };
+
+    form.addEventListener('reset', handleReset);
+    return () => form.removeEventListener('reset', handleReset);
+  }, [defaultValue]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let val = e.target.value;
@@ -117,6 +131,7 @@ export function MoneyInput({
     <div className="relative inline-flex items-center w-full justify-center">
       {/* Real Input */}
       <input
+        ref={inputRef}
         type="text"
         inputMode="decimal"
         value={displayValue}

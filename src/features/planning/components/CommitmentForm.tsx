@@ -14,9 +14,9 @@ import { calcInstallmentAmount, calcTotalAmount } from '../utils/amountUtils';
 import { PlanningService } from '../services/planningService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
 
 interface CommitmentFormProps {
-  ownerId: string;
   initial?: Partial<FinancialCommitment>;
   onSuccess?: () => void;
 }
@@ -58,7 +58,7 @@ function getLocalYYYYMMDD(d: Date) {
   return `${y}-${m}-${day}`;
 }
 
-export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormProps) {
+export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
   const router = useRouter();
   const isEdit = !!initial?.id;
 
@@ -68,7 +68,7 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
     initial?.periodicity ?? CommitmentPeriodicity.MONTHLY
   );
   const [biweeklyPeriod, setBiweeklyPeriod] = useState<'Q1' | 'Q2'>(
-    initial?.biweeklyPeriod ?? 'Q1'
+    initial?.biweeklyPeriod === 2 ? 'Q2' : 'Q1'
   );
   const [firstDueDate, setFirstDueDate] = useState(
     initial?.firstDueDate ? initial.firstDueDate.split('T')[0] : getLocalYYYYMMDD(new Date())
@@ -91,8 +91,9 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
   const [errors, setErrors] = useState<Partial<Record<string, string>>>({});
   const [saving, setSaving] = useState(false);
 
-  const categories = useLiveQuery(() => db.categories.toArray()) ?? [];
-  const settings = useLiveQuery(() => db.settings.where('userId').equals(ownerId).first());
+  const categories = WorkspaceQueries.useCategories();
+  const settings = WorkspaceQueries.useSettings();
+  const ownerId = WorkspaceQueries.useActiveWorkspaceId();
   const isBiweeklyMode = settings?.planningMode === 'BIWEEKLY';
 
   // Real-time calculation for Mode A
@@ -144,31 +145,38 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
     }
     setErrors({});
     setSaving(true);
+    
+    if (!ownerId) {
+      setErrors({ form: 'No active workspace found' });
+      setSaving(false);
+      return;
+    }
 
     try {
       const payload = {
         ownerId,
         name: formData.name.trim(),
-        description: formData.description,
-        categoryId: formData.categoryId,
+        description: formData.description || undefined,
+        categoryId: formData.categoryId || undefined,
         type: formData.type,
-        amountTotal: formData.amountTotal,
+        amountTotal: formData.amountTotal || undefined,
+        amount: formData.installmentAmount!,
         installmentAmount: formData.installmentAmount!,
-        installments: formData.installments,
-        remainingAmount: formData.amountTotal,
+        installments: formData.installments || undefined,
+        remainingAmount: formData.amountTotal || undefined,
         periodicity: formData.periodicity,
-        biweeklyPeriod: formData.periodicity === CommitmentPeriodicity.BIWEEKLY ? biweeklyPeriod : undefined,
+        biweeklyPeriod: formData.periodicity === CommitmentPeriodicity.BIWEEKLY ? (biweeklyPeriod === 'Q1' ? 1 : 2) : undefined,
         firstDueDate: new Date(formData.firstDueDate).toISOString(),
-        dayOfMonth: formData.dayOfMonth,
+        dayOfMonth: formData.dayOfMonth || undefined,
         hasReminder: formData.hasReminder,
         reminderDaysBefore: formData.reminderDaysBefore,
         reminderTime: reminderTime,
         isRecurring: formData.isRecurring,
-        endDate: null,
-        notes: formData.notes,
-        customTypeName: formData.customTypeName,
-        customPeriodicityDays: formData.customPeriodicityDays,
-        notificationIntentId: initial?.notificationIntentId || null,
+        endDate: undefined,
+        notes: formData.notes || undefined,
+        customTypeName: formData.customTypeName || undefined,
+        customPeriodicityDays: formData.customPeriodicityDays ? Number(formData.customPeriodicityDays) : undefined,
+        notificationIntentId: initial?.notificationIntentId || undefined,
       };
 
       if (formData.hasReminder) {
@@ -205,7 +213,7 @@ export function CommitmentForm({ ownerId, initial, onSuccess }: CommitmentFormPr
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ intentId: payload.notificationIntentId })
           });
-          payload.notificationIntentId = null;
+          payload.notificationIntentId = undefined;
         } catch (e) {
           console.error('Failed to cancel notification', e);
         }
