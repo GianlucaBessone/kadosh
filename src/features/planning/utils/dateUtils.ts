@@ -118,7 +118,23 @@ export function getNextDate(
   const targetMonth = firstDate.getMonth() + index * monthsMultiplier;
   
   // Preserve the original day of month, clamped to the target month's days
-  const originalDay = commitment.dayOfMonth ?? firstDate.getDate();
+  let originalDay = commitment.dayOfMonth ?? firstDate.getDate();
+  
+  if (index > 0 && commitment.biweeklyPeriod) {
+    const assignedQ = commitment.biweeklyPeriod;
+    const naturalQ = originalDay <= 15 ? 1 : 2;
+    if (assignedQ !== naturalQ) {
+      const startOfOriginalQ = naturalQ === 1 ? 1 : 16;
+      const dayOffset = originalDay - startOfOriginalQ;
+      
+      const startOfTargetQ = assignedQ === 1 ? 1 : 16;
+      originalDay = startOfTargetQ + dayOffset;
+      if (assignedQ === 1) {
+        originalDay = Math.min(originalDay, 15);
+      }
+    }
+  }
+
   const targetYear = firstDate.getFullYear();
   const daysInTargetMonth = new Date(targetYear, targetMonth + 1, 0).getDate();
   const actualDay = Math.min(originalDay, daysInTargetMonth);
@@ -147,27 +163,6 @@ export function installmentAppliesToPeriod(
   period: PlanningPeriod
 ): boolean {
   if (period === 'MONTH') return true;
-
-  const isMonthlyOrHigher = [
-    CommitmentPeriodicity.MONTHLY,
-    CommitmentPeriodicity.BIMONTHLY,
-    CommitmentPeriodicity.QUARTERLY,
-    CommitmentPeriodicity.SEMIANNUAL,
-    CommitmentPeriodicity.YEARLY
-  ].includes(commitment.periodicity);
-  
-  if (isMonthlyOrHigher && commitment.biweeklyPeriod) {
-    const assignedPeriod = commitment.biweeklyPeriod === 1 ? 'Q1' : 'Q2';
-    if (assignedPeriod === period) return true;
-    
-    // If viewing Q2, carry over unpaid Q1 commitments
-    if (period === 'Q2' && assignedPeriod === 'Q1') {
-      const isUnpaid = installment.installmentIndex >= (commitment.currentInstallment || 0);
-      if (isUnpaid) return true;
-    }
-    
-    return false;
-  }
   
   // Otherwise, fallback to the actual date
   const day = installment.dueDate.getDate();

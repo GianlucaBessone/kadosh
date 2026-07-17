@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db } from '@/lib/db';
 import type { FinancialCommitment } from '@/lib/db';
 import { generateInstallmentsForMonth, installmentAppliesToPeriod } from '../utils/dateUtils';
 import type { PlanningPeriod, MonthlyCommitmentItem } from '../types';
@@ -53,17 +55,22 @@ export function useMonthlySummary(
   year: number,
   period: PlanningPeriod = 'MONTH'
 ) {
-  return useMemo(() => {
+  return useLiveQuery(async () => {
     let totalCommitted = 0;
     let totalQ1 = 0;
     let totalQ2 = 0;
     let nextDueDate: Date | null = null;
     let count = 0;
+    
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
 
     for (const c of commitments) {
       // Allow CANCELLED and COMPLETED so they contribute to past months' summaries
       
       const generated = generateInstallmentsForMonth(c, month, year);
+      const payments = await db.commitmentPayments.where('commitmentId').equals(c.id).filter(p => !p.deletedAt).toArray();
+      const paidInstallments = new Set(payments.map(p => p.installmentNumber));
       
       for (const inst of generated) {
         if (installmentAppliesToPeriod(c, inst, period)) {
@@ -76,8 +83,11 @@ export function useMonthlySummary(
             totalQ2 += c.installmentAmount;
           }
 
-          if (!nextDueDate || inst.dueDate < nextDueDate) {
-            nextDueDate = inst.dueDate;
+          const isPaid = paidInstallments.has(inst.installmentIndex + 1);
+          if (!isPaid && inst.dueDate >= now) {
+            if (!nextDueDate || inst.dueDate < nextDueDate) {
+              nextDueDate = inst.dueDate;
+            }
           }
         }
       }
@@ -90,5 +100,11 @@ export function useMonthlySummary(
       totalQ2,
       nextDueDate,
     };
-  }, [commitments, month, year, period]);
+  }, [commitments, month, year, period], {
+    count: 0,
+    totalCommitted: 0,
+    totalQ1: 0,
+    totalQ2: 0,
+    nextDueDate: null,
+  });
 }

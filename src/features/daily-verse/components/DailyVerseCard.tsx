@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Share2, Droplet } from 'lucide-react';
 import { DailyVerseService } from '../service';
@@ -19,9 +19,33 @@ const LeafIcon = ({ className }: { className?: string }) => (
 export function DailyVerseCard() {
   const [verse, setVerse] = useState<DailyVerse | null>(null);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+  const [isPulsing, setIsPulsing] = useState(false);
+  const iconRef = useRef<HTMLButtonElement>(null);
 
   // Solo mostrar si la configuración lo permite
   const settings = useLiveQuery(() => db.settings.orderBy('id').first());
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting) {
+          setIsPulsing(true);
+          setTimeout(() => setIsPulsing(false), 3000); // 3 seconds of pulsing
+          observer.disconnect();
+        }
+      },
+      { 
+        threshold: 0,
+        rootMargin: '0px 0px -50% 0px'
+      }
+    );
+
+    if (iconRef.current) {
+      observer.observe(iconRef.current);
+    }
+
+    return () => observer.disconnect();
+  }, [verse]);
 
   useEffect(() => {
     async function loadVerse() {
@@ -43,7 +67,7 @@ export function DailyVerseCard() {
 
   return (
     <>
-      <Card className="bg-primary/5 border-none shadow-none rounded-3xl relative overflow-hidden mt-6">
+      <Card className="bg-primary/5 border-none shadow-none rounded-3xl relative overflow-hidden mt-2">
         <div className="absolute top-0 right-0 p-4 opacity-10 pointer-events-none z-0">
           <Droplet className="w-24 h-24" />
         </div>
@@ -60,11 +84,13 @@ export function DailyVerseCard() {
 
           {/* Botón Compartir en la esquina */}
           <button 
+            ref={iconRef}
             onClick={() => setIsShareModalOpen(true)}
-            className="absolute top-4 right-4 p-2 rounded-full text-primary/50 hover:text-primary hover:bg-primary/10 transition-colors z-20"
+            className={`absolute top-2 right-4 flex items-center justify-center w-10 h-10 rounded-full text-primary/60 hover:text-primary hover:bg-primary/10 transition-all duration-500 z-20 ${isPulsing ? 'animate-pulse scale-125 bg-primary/10 text-primary shadow-sm drop-shadow-md' : 'scale-100'}`}
+            style={isPulsing ? { animationDuration: '3s' } : undefined}
             title="Compartir"
           >
-            <Share2 className="w-4 h-4" />
+            <Share2 className="w-5 h-5" />
           </button>
 
           <div className="flex flex-col gap-4">

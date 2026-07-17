@@ -15,7 +15,7 @@ export function formatMoney(amount: number): string {
 }
 
 export function formatMoneyCompact(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000) {
+  if (Math.abs(amount) >= 100_000_000) {
     const millions = amount / 1_000_000;
     const formatted = millions.toLocaleString('es-AR', {
       minimumFractionDigits: 0,

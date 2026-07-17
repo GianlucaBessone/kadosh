@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { SelectPicker } from '@/components/ui/picker/select/SelectPicker';
 import { Loader2 } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
@@ -102,16 +102,16 @@ export function SupportForm({ isOpen, onClose, defaultType }: SupportFormProps) 
             <div className="space-y-3 py-2">
               <div className="space-y-1">
                 <Label htmlFor="type">Tipo</Label>
-                <Select value={type} onValueChange={setType}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Selecciona un tipo" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="BUG">Reportar un problema</SelectItem>
-                    <SelectItem value="FEATURE">Solicitar una nueva función</SelectItem>
-                    <SelectItem value="QUESTION">Hacer una consulta</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SelectPicker
+                  value={type}
+                  onChange={setType}
+                  placeholder="Selecciona un tipo"
+                  items={[
+                    { value: 'BUG', label: 'Reportar un problema' },
+                    { value: 'FEATURE', label: 'Solicitar una nueva función' },
+                    { value: 'QUESTION', label: 'Hacer una consulta' }
+                  ]}
+                />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="subject">Asunto</Label>

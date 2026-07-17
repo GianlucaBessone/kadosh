@@ -15,6 +15,9 @@ import { PlanningService } from '../services/planningService';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
+import { SelectPicker } from '@/components/ui/picker/select/SelectPicker';
+import { DatePicker } from '@/components/ui/picker/date/DatePicker';
+import { TimePicker } from '@/components/ui/picker/time/TimePicker';
 
 interface CommitmentFormProps {
   initial?: Partial<FinancialCommitment>;
@@ -285,15 +288,12 @@ export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
       {/* Periodicidad */}
       <Field label="Periodicidad" error={errors.periodicity}>
         <div className="flex flex-col gap-3">
-          <select
+          <SelectPicker
             value={periodicity}
-            onChange={e => setPeriodicity(e.target.value as CommitmentPeriodicity)}
+            onChange={val => setPeriodicity(val as CommitmentPeriodicity)}
+            items={Object.entries(PERIODICITY_LABELS).map(([key, label]) => ({ value: key, label }))}
             className={selectClass}
-          >
-            {Object.entries(PERIODICITY_LABELS).map(([key, label]) => (
-              <option key={key} value={key}>{label}</option>
-            ))}
-          </select>
+          />
 
           {periodicity === CommitmentPeriodicity.CUSTOM && (
             <div className="mt-1">
@@ -352,10 +352,9 @@ export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
 
       {/* Primer vencimiento */}
       <Field label="Primer vencimiento" error={errors.firstDueDate}>
-        <input
-          type="date"
-          value={firstDueDate}
-          onChange={e => setFirstDueDate(e.target.value)}
+        <DatePicker
+          value={firstDueDate ? new Date(firstDueDate + "T00:00:00") : undefined}
+          onChange={date => setFirstDueDate(date ? getLocalYYYYMMDD(date) : "")}
           className={inputClass}
         />
       </Field>
@@ -510,16 +509,16 @@ export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
       {/* Categoría */}
       {categories.length > 0 && (
         <Field label="Categoría (opcional)">
-          <select
+          <SelectPicker
             value={categoryId}
-            onChange={e => setCategoryId(e.target.value)}
+            onChange={setCategoryId}
+            placeholder="Sin categoría"
+            items={[
+              { value: "", label: "Sin categoría" },
+              ...categories.map(c => ({ value: c.id, label: c.name }))
+            ]}
             className={selectClass}
-          >
-            <option value="">Sin categoría</option>
-            {categories.map(c => (
-              <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-          </select>
+          />
         </Field>
       )}
 
@@ -579,17 +578,11 @@ export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Hora de notificación</label>
-              <select
+              <TimePicker
                 value={reminderTime}
-                onChange={e => setReminderTime(e.target.value)}
-                className="w-full h-12 rounded-xl bg-card border border-border shadow-sm px-4 focus:ring-primary focus:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary text-base font-medium"
-              >
-                {Array.from({ length: 24 }).map((_, i) => {
-                  const hour = String(i).padStart(2, '0');
-                  const time = `${hour}:00`;
-                  return <option key={time} value={time}>{time} hs</option>;
-                })}
-              </select>
+                onChange={setReminderTime}
+                className="w-full h-12 rounded-xl bg-card border border-border shadow-sm focus-visible:ring-primary focus-visible:ring-2 text-base font-medium"
+              />
             </div>
           </div>
         )}

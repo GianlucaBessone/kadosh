@@ -97,7 +97,26 @@ export class PlanningService {
   }
 
   static async cancelFutureCommitments(id: string): Promise<void> {
-    await this.updateCommitment(id, { status: CommitmentStatus.CANCELLED });
+    const commitment = await PlanningRepository.getCommitmentById(id);
+    if (!commitment) return;
+    
+    const payments = await db.commitmentPayments.where('commitmentId').equals(id).filter(p => !p.deletedAt).toArray();
+    let maxPaidDueDate = new Date(0);
+    
+    if (payments.length > 0) {
+      const maxInstallmentIndex = Math.max(...payments.map(p => p.installmentNumber)) - 1;
+      const firstDate = new Date(commitment.firstDueDate);
+      const d = new Date(firstDate.getUTCFullYear(), firstDate.getUTCMonth(), firstDate.getUTCDate());
+      maxPaidDueDate = getNextDate(commitment, d, maxInstallmentIndex);
+    }
+    
+    const now = new Date();
+    const endDateToUse = maxPaidDueDate > now ? maxPaidDueDate : now;
+
+    await this.updateCommitment(id, { 
+      status: CommitmentStatus.CANCELLED,
+      endDate: endDateToUse.toISOString()
+    });
   }
 
   static async pauseCommitment(id: string, untilDate?: string | null): Promise<void> {
@@ -207,6 +226,16 @@ export class PlanningService {
       const monthInstallments = await PlanningService.getCommitmentsForMonth(ownerId, m, y);
       for (const item of monthInstallments) {
         if (item.dueDate < now) continue;
+        
+        // Skip if already paid
+        const paymentsCount = await db.commitmentPayments
+          .where('commitmentId')
+          .equals(item.commitment.id)
+          .filter(p => !p.deletedAt && p.installmentNumber === item.installmentIndex + 1)
+          .count();
+          
+        if (paymentsCount > 0) continue;
+
         if (!bestCandidate || item.dueDate < bestCandidate.dueDate) {
           bestCandidate = item;
         }

@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { TimePicker } from '@/components/ui/picker/time/TimePicker';
 import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { formatShortDate } from '../utils/dateUtils';
 import { calcRemainingAmount } from '../utils/amountUtils';
@@ -398,24 +398,11 @@ export function CommitmentCard({
 
                   <div className="flex flex-col gap-1.5">
                     <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider ml-1">Hora de notificación</label>
-                    <Select value={tempReminderTime} onValueChange={setTempReminderTime}>
-                    <SelectTrigger className="w-full h-12 rounded-xl bg-card border border-border shadow-sm px-4 focus:ring-primary focus:ring-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary text-base font-medium">
-                      <SelectValue placeholder="Seleccionar hora" />
-                    </SelectTrigger>
-                    <SelectContent className="max-h-[250px]">
-                      {Array.from({ length: 48 }).map((_, i) => {
-                        const hour = String(Math.floor(i / 2)).padStart(2, '0');
-                        const min = i % 2 === 0 ? '00' : '30';
-                        const time = `${hour}:${min}`;
-                        return (
-                          <SelectItem key={time} value={time}>
-                            {time} hs
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                </div>
+                    <TimePicker
+                      value={tempReminderTime}
+                      onChange={setTempReminderTime}
+                    />
+                  </div>
               </>
             )}
 

@@ -6,6 +6,7 @@ import { Loader2, Search, Filter, MessageSquare, Bug, Lightbulb, HelpCircle } fr
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { SelectPicker } from '@/components/ui/picker/select/SelectPicker';
 
 export default function AdminSoporte() {
   const [activeTab, setActiveTab] = useState<'TICKETS' | 'FEEDBACK'>('TICKETS');
@@ -164,18 +165,19 @@ export default function AdminSoporte() {
                     <div className="w-full lg:w-64 flex flex-col gap-3">
                       <div>
                         <label className="text-xs font-medium text-slate-500 mb-1 block">Estado</label>
-                        <select 
+                        <SelectPicker 
                           className="w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-md p-2 text-sm"
                           value={item.status}
-                          onChange={(e) => updateStatus(item.id, e.target.value)}
-                        >
-                          <option value="NEW">Nuevo</option>
-                          <option value="OPEN">Abierto</option>
-                          <option value="IN_PROGRESS">En Progreso</option>
-                          <option value="REVIEWED">Revisado</option>
-                          <option value="RESOLVED">Resuelto</option>
-                          <option value="CLOSED">Cerrado</option>
-                        </select>
+                          onChange={(value) => updateStatus(item.id, value)}
+                          items={[
+                            { value: "NEW", label: "Nuevo" },
+                            { value: "OPEN", label: "Abierto" },
+                            { value: "IN_PROGRESS", label: "En Progreso" },
+                            { value: "REVIEWED", label: "Revisado" },
+                            { value: "RESOLVED", label: "Resuelto" },
+                            { value: "CLOSED", label: "Cerrado" }
+                          ]}
+                        />
                       </div>
                       
                       <div>

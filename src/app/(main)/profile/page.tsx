@@ -298,8 +298,8 @@ function AssociateAccountBanner({ userId }: { userId: string }) {
 export default function ProfilePage() {
   const router = useRouter();
   const user = useLiveQuery(() => db.users.orderBy('id').first());
-  const workspace = WorkspaceQueries.useActiveWorkspace();
-  const settings = workspace?.settings as any;
+  const settingsArray = useLiveQuery(() => db.settings.toArray());
+  const settings = settingsArray ? settingsArray[0] : undefined;
   const { isDark, toggleTheme } = useTheme();
 
   useEffect(() => {
@@ -577,14 +577,14 @@ export default function ProfilePage() {
               <Button 
                 variant={settings?.planningMode === 'MONTHLY' || !settings?.planningMode ? 'default' : 'outline'} 
                 className="w-full font-semibold rounded-xl"
-                onClick={() => updateSetting({ planningMode: 'MONTHLY' })}
+                onClick={() => updateSetting({ planningMode: 'MONTHLY', hasSelectedPlanningMode: true })}
               >
                 Mensual
               </Button>
               <Button 
                 variant={settings?.planningMode === 'BIWEEKLY' ? 'default' : 'outline'} 
                 className="w-full font-semibold rounded-xl"
-                onClick={() => updateSetting({ planningMode: 'BIWEEKLY' })}
+                onClick={() => updateSetting({ planningMode: 'BIWEEKLY', hasSelectedPlanningMode: true })}
               >
                 Quincenal
               </Button>

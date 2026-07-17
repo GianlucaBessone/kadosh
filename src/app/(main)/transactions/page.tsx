@@ -11,6 +11,8 @@ import { TransactionCard } from '@/components/transactions/TransactionCard';
 import { ExportModal } from '@/components/transactions/ExportModal';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/picker/date/DatePicker';
+import { format } from 'date-fns';
 
 type QuickFilter = 'ALL' | 'INCOME' | 'EXPENSE' | 'WATER' | 'HARVEST' | 'TITHE';
 
@@ -357,19 +359,17 @@ export default function TransactionsPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Desde</label>
-                    <Input 
-                      type="date" 
-                      value={advFilters.dateFrom} 
-                      onChange={e => setAdvFilters(p => ({ ...p, dateFrom: e.target.value }))}
+                    <DatePicker 
+                      value={advFilters.dateFrom ? new Date(advFilters.dateFrom + "T00:00:00") : undefined} 
+                      onChange={d => setAdvFilters(p => ({ ...p, dateFrom: d ? format(d, 'yyyy-MM-dd') : '' }))}
                       className="h-12 rounded-xl"
                     />
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">Hasta</label>
-                    <Input 
-                      type="date" 
-                      value={advFilters.dateTo} 
-                      onChange={e => setAdvFilters(p => ({ ...p, dateTo: e.target.value }))}
+                    <DatePicker 
+                      value={advFilters.dateTo ? new Date(advFilters.dateTo + "T00:00:00") : undefined} 
+                      onChange={d => setAdvFilters(p => ({ ...p, dateTo: d ? format(d, 'yyyy-MM-dd') : '' }))}
                       className="h-12 rounded-xl"
                     />
                   </div>

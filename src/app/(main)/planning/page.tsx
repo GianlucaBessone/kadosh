@@ -147,29 +147,7 @@ export default function PlanningPage() {
       />
 
       {/* Commitment list */}
-      {isEmpty ? (
-        <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
-          <div className="w-16 h-16 rounded-full bg-primary/5 flex items-center justify-center">
-            <CalendarDays className="w-8 h-8 text-primary/40" strokeWidth={1.5} />
-          </div>
-          <div>
-            <h3 className="font-semibold text-foreground mb-1">Sin compromisos aún</h3>
-            <p className="text-sm text-muted-foreground max-w-xs">
-              Agregá tus compromisos financieros para anticipar y planificar con tranquilidad.
-            </p>
-          </div>
-          <Link
-            href="/planning/new"
-            className="bg-primary text-primary-foreground px-6 py-3 rounded-2xl text-sm font-semibold hover:bg-primary/90 transition-colors"
-          >
-            Crear primer compromiso
-          </Link>
-        </div>
-      ) : monthlyEntries.length === 0 ? (
-        <div className="text-center py-10 text-muted-foreground text-sm">
-          Sin compromisos para este mes.
-        </div>
-      ) : (
+      {monthlyEntries.length > 0 ? (
         <div className="flex flex-col gap-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
@@ -193,6 +171,28 @@ export default function PlanningPage() {
               />
             );
           })}
+        </div>
+      ) : isEmpty ? (
+        <div className="flex flex-col items-center justify-center py-16 gap-5 text-center">
+          <div className="w-16 h-16 rounded-full bg-primary/5 flex items-center justify-center">
+            <CalendarDays className="w-8 h-8 text-primary/40" strokeWidth={1.5} />
+          </div>
+          <div>
+            <h3 className="font-semibold text-foreground mb-1">Sin compromisos aún</h3>
+            <p className="text-sm text-muted-foreground max-w-xs">
+              Agregá tus compromisos financieros para anticipar y planificar con tranquilidad.
+            </p>
+          </div>
+          <Link
+            href="/planning/new"
+            className="bg-primary text-primary-foreground px-6 py-3 rounded-2xl text-sm font-semibold hover:bg-primary/90 transition-colors"
+          >
+            Crear primer compromiso
+          </Link>
+        </div>
+      ) : (
+        <div className="text-center py-10 text-muted-foreground text-sm">
+          Sin compromisos para este mes.
         </div>
       )}
 
