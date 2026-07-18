@@ -29,6 +29,8 @@ model User {
   feedbacks             Feedback[]
   donations             Donation[]
   prayers               Prayer[]
+  prayerRequests        PrayerRequest[]
+  prayerInteractions    PrayerInteraction[]
   developerInfoRequests DeveloperInfoRequest[]
 }
 
@@ -301,6 +303,38 @@ model Prayer {
   createdAt DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─── Community Prayer Requests ───────────────────────
+model PrayerRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String?   @db.Uuid
+  userId      String    @db.Uuid
+  message     String    @db.VarChar(500)
+  status      String    @default("ACTIVE") // ACTIVE | ARCHIVED
+  prayerCount Int       @default(0)
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime
+  archivedAt  DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  user         User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  interactions PrayerInteraction[]
+
+  @@index([status, expiresAt])
+  @@index([userId, status])
+}
+
+model PrayerInteraction {
+  id              String   @id @default(uuid()) @db.Uuid
+  prayerRequestId String   @db.Uuid
+  userId          String   @db.Uuid
+  createdAt       DateTime @default(now())
+
+  prayerRequest PrayerRequest @relation(fields: [prayerRequestId], references: [id], onDelete: Cascade)
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([prayerRequestId, userId])
 }
 
 // ─── Developer Info Request ──────────────────────────

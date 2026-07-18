@@ -12,6 +12,7 @@ import { MoneyDisplay } from '@/components/ui/MoneyDisplay';
 import { DailyVerseCard } from '@/features/daily-verse/components/DailyVerseCard';
 import { TransactionCard } from '@/components/transactions/TransactionCard';
 import { NextCommitmentCard } from '@/features/planning/components/NextCommitmentCard';
+import { PrayerCommunityCard } from '@/features/oraciones/components/PrayerCommunityCard';
 import { PlanningService } from '@/features/planning/services/planningService';
 import type { FinancialCommitment } from '@/lib/db';
 import { PlanningModeModal } from '@/components/onboarding/PlanningModeModal';
@@ -279,6 +280,8 @@ export default function HomePage() {
           <span className="text-[10px] font-medium">Diezmo</span>
         </Link>
       </div>
+
+      {settingsQuery?.showPrayerCard ?? true ? <PrayerCommunityCard /> : null}
 
       <DailyVerseCard />
 

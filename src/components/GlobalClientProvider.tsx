@@ -145,7 +145,15 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
     // Check and claim workspace before starting sync engine
     import('@/services/WorkspaceAssociationService').then(({ WorkspaceAssociationService }) => {
       WorkspaceAssociationService.checkAndClaimWorkspace().finally(() => {
-        syncEngine.start();
+        // Solo iniciar el motor de sincronización si hay conexión
+        if (navigator.onLine) {
+          syncEngine.start();
+        } else {
+          // Escuchar evento de conexión para iniciar la sincronización cuando haya conexión
+          window.addEventListener('online', () => {
+            syncEngine.start();
+          });
+        }
       });
     });
 

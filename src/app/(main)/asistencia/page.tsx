@@ -8,7 +8,6 @@ import { SupportForm } from '@/components/asistencia/SupportForm';
 import { FeedbackForm } from '@/components/asistencia/FeedbackForm';
 import { NPSForm } from '@/components/asistencia/NPSForm';
 import { DonationSection } from '@/components/asistencia/DonationSection';
-import { PrayerSection } from '@/components/asistencia/PrayerSection';
 import { MissionSection } from '@/components/asistencia/MissionSection';
 import { DeveloperCard } from '@/components/asistencia/DeveloperCard';
 
@@ -102,10 +101,7 @@ export default function AsistenciaPage() {
       {/* 3. Donaciones */}
       <DonationSection />
 
-      {/* 4. Orar por este proyecto */}
-      <PrayerSection />
-
-      {/* 5. Nuestra misión & Developer */}
+      {/* 4. Nuestra misión & Developer */}
       <MissionSection />
 
       {/* Modals */}

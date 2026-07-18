@@ -23,6 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  // Eliminando 'display' porque no es una propiedad válida en Viewport
 };
 
 export const metadata: Metadata = {
@@ -37,6 +38,12 @@ export const metadata: Metadata = {
   formatDetection: {
     telephone: false,
   },
+  // Asegurar que la aplicación pueda funcionar offline
+  other: {
+    'mobile-web-app-capable': 'yes',
+    'apple-mobile-web-app-title': 'KADOSH',
+    'application-name': 'KADOSH',
+  }
 };
 
 import { GlobalClientProvider } from '@/components/GlobalClientProvider';
@@ -60,4 +67,3 @@ export default function RootLayout({
     </html>
   );
 }
-

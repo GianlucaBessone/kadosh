@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import {
   User, Moon, Bell, Download, LogOut, BookOpen,
   Camera, Mail, Sun, ChevronRight, Loader2, CalendarDays, Volume2, ShieldCheck,
-  CheckCircle2, Circle, AlertCircle
+  CheckCircle2, Circle, AlertCircle, HelpingHand
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -528,6 +528,28 @@ export default function ProfilePage() {
                 id="daily-verse"
                 checked={settings?.dailyVerse ?? true}
                 onCheckedChange={(checked) => updateSetting({ dailyVerse: checked })}
+              />
+            </div>
+
+            {/* Prayer card access */}
+            <div className="flex items-center justify-between p-4">
+              <div className="flex items-center gap-3">
+                <div className="bg-primary/10 p-2 rounded-full text-primary">
+                  <HelpingHand className="w-4 h-4" />
+                </div>
+                <div>
+                  <Label htmlFor="show-prayer-card" className="text-sm font-medium">
+                    Acceso rápido a oraciones
+                  </Label>
+                  <p className="text-xs text-muted-foreground leading-tight">
+                    Mostrar tarjeta de comunidad en la pantalla principal.
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="show-prayer-card"
+                checked={settings?.showPrayerCard ?? true}
+                onCheckedChange={(checked) => updateSetting({ showPrayerCard: checked })}
               />
             </div>
 

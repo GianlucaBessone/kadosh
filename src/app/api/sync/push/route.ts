@@ -50,7 +50,7 @@ export async function POST(request: Request) {
             ownerUserId: event.ownerUserId,
             deviceId: event.deviceId || null,
             keyId: event.keyId,
-            createdAt: event.createdAt ? new Date(event.createdAt) : new Date(),
+            createdAt: new Date(),
           },
           update: {
             // El Event Store es inmutable, por lo que las actualizaciones sobre eventos existentes

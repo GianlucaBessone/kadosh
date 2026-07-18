@@ -9,9 +9,14 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Get all workspaces the user owns
+    // Get all workspaces the user owns or is a member of
     const workspaces = await prisma.workspace.findMany({
-      where: { ownerId: user.id }
+      where: {
+        OR: [
+          { ownerId: user.id },
+          { members: { some: { userId: user.id } } }
+        ]
+      }
     });
 
     return NextResponse.json({ workspaces });

@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { toast } from 'sonner';
+import { clearSupabaseCookies } from '@/features/auth/localAuth';
 
 export class WorkspaceAssociationService {
   /**
@@ -21,9 +22,19 @@ export class WorkspaceAssociationService {
       }
 
       // 1. Obtener Workspaces en la nube
-      const workspacesRes = await fetch('/api/workspaces', { method: 'GET' });
+      const workspacesRes = await fetch('/api/workspaces', {
+        method: 'GET',
+        credentials: 'include',
+      });
       if (!workspacesRes.ok) {
-        console.error('Failed to fetch cloud workspaces');
+        const errorText = await workspacesRes.text();
+        if (workspacesRes.status === 401 || workspacesRes.status === 403) {
+          console.warn('Unauthorized cloud workspace fetch. Clearing stale Supabase session cookies.', workspacesRes.status, errorText);
+          clearSupabaseCookies();
+          return false;
+        }
+
+        console.error('Failed to fetch cloud workspaces', workspacesRes.status, errorText);
         return false;
       }
       
@@ -68,6 +79,7 @@ export class WorkspaceAssociationService {
       // 3. Reclamar el Workspace (Casos: no hay en la nube, o ya está en la nube)
       const claimRes = await fetch('/api/workspaces/claim', {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ workspaceId: localWorkspace.id })
       });

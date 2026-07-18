@@ -55,6 +55,7 @@ export interface Settings {
   showReflection: boolean;
   offlineDownload: boolean;
   soundEffects: boolean;
+  showPrayerCard?: boolean;
   planningMode?: 'MONTHLY' | 'BIWEEKLY';
   hasSelectedPlanningMode?: boolean;
   createdAt: string;
@@ -345,6 +346,27 @@ export interface CommitmentPayment {
   updatedAt: string;
   deletedAt: string | null;
 }
+
+export interface PrayerRequest {
+  id: string;
+  workspaceId: string;
+  userId: string;
+  message: string;
+  status: 'ACTIVE' | 'ARCHIVED';
+  prayerCount: number;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  archivedAt: string | null;
+}
+
+export interface PrayerInteraction {
+  id: string;
+  prayerRequestId: string;
+  userId: string;
+  createdAt: string;
+}
+
 export interface Notification {
   id: string;
   userId: string;
@@ -417,6 +439,8 @@ export class KadoshDB extends Dexie {
   tithes!: EntityTable<Tithe, 'id'>;
   financialCommitments!: EntityTable<FinancialCommitment, 'id'>;
   commitmentPayments!: EntityTable<CommitmentPayment, 'id'>;
+  prayerRequests!: EntityTable<PrayerRequest, 'id'>;
+  prayerInteractions!: EntityTable<PrayerInteraction, 'id'>;
   processedProjectionEvents!: EntityTable<ProcessedProjectionEvent, 'eventId'>;
   projectionDeadLetters!: EntityTable<ProjectionDeadLetter, 'eventId'>;
   projectionHealth!: EntityTable<ProjectionHealth, 'workspaceId'>;
@@ -456,7 +480,7 @@ export class KadoshDB extends Dexie {
       financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
       commitmentPayments: 'id, commitmentId, status, date, deletedAt',
     });
-    this.version(13).stores({
+    this.version(15).stores({
       users: 'id, email, isCloudLinked',
       settings: 'id, userId',
       workspaces: 'id, ownerId',
@@ -474,6 +498,10 @@ export class KadoshDB extends Dexie {
       motivationalVerses: 'id, category',
       projectionState: 'workspaceId',
       processedProjectionEvents: 'eventId, workspaceId',
+      projectionDeadLetters: 'eventId, workspaceId, sequence, status',
+      projectionHealth: 'workspaceId, status',
+      projectionMetrics: 'workspaceId',
+      projectionCheckpoints: 'workspaceId',
       accounts: 'id, workspaceId, deletedAt',
       categories: 'id, workspaceId, type, deletedAt',
       transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
@@ -482,6 +510,8 @@ export class KadoshDB extends Dexie {
       tithes: 'id, workspaceId, [month+year], deletedAt',
       financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
       commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+      prayerRequests: 'id, workspaceId, userId, status, expiresAt',
+      prayerInteractions: 'id, prayerRequestId, userId, [prayerRequestId+userId]'
     });
     this.version(12).stores({
       users: 'id, email, isCloudLinked',

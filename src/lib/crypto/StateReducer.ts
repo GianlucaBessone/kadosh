@@ -24,6 +24,7 @@ export class StateReducer {
     await db.transaction('rw', [
       db.accounts, db.categories, db.transactions, 
       db.seedGoals, db.seedContributions, db.tithes, db.financialCommitments, db.commitmentPayments,
+      db.prayerRequests, db.prayerInteractions,
       db.processedProjectionEvents, db.projectionState,
       db.projectionDeadLetters, db.projectionMetrics, db.projectionCheckpoints
     ], async () => {
@@ -360,6 +361,40 @@ export class StateReducer {
                     updatedAt: now
                   });
                 }
+              }
+              break;
+            }
+
+            case 'PrayerRequestCreated': {
+              await db.prayerRequests.put({
+                id: payload.prayerRequestId,
+                workspaceId,
+                userId: payload.userId,
+                message: payload.message,
+                status: 'ACTIVE',
+                prayerCount: 0,
+                createdAt: payload.createdAt,
+                updatedAt: payload.createdAt,
+                expiresAt: payload.expiresAt,
+                archivedAt: null
+              });
+              break;
+            }
+
+            case 'PrayerInteractionCreated': {
+              await db.prayerInteractions.put({
+                id: payload.interactionId,
+                prayerRequestId: payload.prayerRequestId,
+                userId: payload.userId,
+                createdAt: payload.createdAt
+              });
+
+              const request = await db.prayerRequests.get(payload.prayerRequestId);
+              if (request) {
+                await db.prayerRequests.update(payload.prayerRequestId, {
+                  prayerCount: (request.prayerCount || 0) + 1,
+                  updatedAt: payload.createdAt
+                });
               }
               break;
             }

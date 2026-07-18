@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { X, Settings, ChevronDown, CalendarDays, Building2, User, LifeBuoy } from 'lucide-react';
+import { X, Settings, ChevronDown, CalendarDays, Building2, User, LifeBuoy, HelpingHand } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -73,6 +73,13 @@ export function MoreSheet({ isOpen, onClose }: MoreSheetProps) {
       label: 'Asistencia',
       description: 'Ayuda, Contacto e Información',
       href: '/asistencia',
+      available: true,
+    },
+    {
+      icon: HelpingHand,
+      label: 'Oraciones',
+      description: 'Acompaña en oración a la comunidad KADOSH',
+      href: '/oraciones',
       available: true,
     },
   ];

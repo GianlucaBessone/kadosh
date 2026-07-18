@@ -55,10 +55,16 @@ export function clearLocalAuth(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem('kadosh_pin_hash');
   sessionStorage.removeItem('kadosh_unlocked');
-  
-  // Clear any Supabase cloud session cookies if present
+  clearSupabaseCookies();
+}
+
+export function clearSupabaseCookies(): void {
+  if (typeof window === 'undefined') return;
   document.cookie.split(';').forEach(c => {
-    document.cookie = c.replace(/^ +/, '').replace(/=.*/, '=;expires=' + new Date().toUTCString() + ';path=/');
+    const cookieName = c.split('=')[0].trim();
+    if (cookieName.startsWith('sb-')) {
+      document.cookie = `${cookieName}=;expires=${new Date(0).toUTCString()};path=/`;
+    }
   });
 }
 

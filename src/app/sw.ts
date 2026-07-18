@@ -31,8 +31,35 @@ for (const entry of defaultCache) {
   }
 }
 
+// Definir rutas específicas para precacheo que deben estar disponibles offline
+const criticalRoutes = [
+  "/",
+  "/login",
+  "/home",
+  "/registro",
+  "/welcome",
+  "/_next/static/chunks/app/layout-bb6cde704e7f2cb2.js",
+  "/_next/static/chunks/app/(main)/layout-9c928af083522b4c.js",
+  "/_next/static/chunks/app/(main)/template-eff60b26f5709b70.js",
+];
+
+// Agregar rutas críticas al precache si no están ya incluidas
+const precacheEntries = self.__SW_MANIFEST || [];
+for (const route of criticalRoutes) {
+  const exists = precacheEntries.some(entry => {
+    if (typeof entry === 'string') {
+      return entry === route;
+    } else {
+      return entry.url === route;
+    }
+  });
+  if (!exists) {
+    precacheEntries.push(route);
+  }
+}
+
 const serwist = new Serwist({
-  precacheEntries: self.__SW_MANIFEST,
+  precacheEntries: precacheEntries,
   skipWaiting: true,
   clientsClaim: true,
   navigationPreload: true,
