@@ -20,6 +20,7 @@ import {
   PlusSquare,
   ShieldCheck,
   CloudOff,
+  Heart, // Added for prayer community slide
 } from 'lucide-react';
 import { usePWA } from '@/hooks/usePWA';
 
@@ -104,7 +105,19 @@ const SLIDES: OnboardingSlide[] = [
     gradient: 'from-[#8FBF9F]/20 to-[#8FBF9F]/5',
     accentColor: 'text-[#8FBF9F]',
   },
-  // ── 5 · Planificación ───────────────────────
+    // ── 5 · Prayer Community ────────────────────
+  {
+    id: 'prayer-community',
+    icon: <Heart className="h-10 w-10" />,
+    badge: 'Comunidad',
+    title: 'Nunca administrás solo',
+    subtitle: 'Una comunidad que ora contigo',
+    body: 'En KADOSH podés pedir oración por tu economía para que otros creyentes te acompañen delante de Dios, y también dedicar unos minutos para orar por quienes atraviesan situaciones similares.',
+    verseRef: 'Gálatas 6:2 (NVI)',
+    gradient: 'from-[#CFAF7A]/20 to-[#CFAF7A]/5',
+    accentColor: 'text-[#CFAF7A]',
+  },
+  // ── 6 · Planificación ───────────────────────
   {
     id: 'planning',
     icon: <CalendarDays className="h-10 w-10" />,
@@ -115,7 +128,7 @@ const SLIDES: OnboardingSlide[] = [
     gradient: 'from-[#85A6B8]/20 to-[#85A6B8]/5',
     accentColor: 'text-[#85A6B8]',
   },
-  // ── 6 · Privacidad ──────────────────────────
+  // ── 7 · Privacidad ──────────────────────────
   {
     id: 'privacy',
     icon: <ShieldCheck className="h-10 w-10" />,
@@ -126,7 +139,7 @@ const SLIDES: OnboardingSlide[] = [
     gradient: 'from-[#85A6B8]/20 to-[#85A6B8]/5',
     accentColor: 'text-[#85A6B8]',
   },
-  // ── 7 · Offline First ───────────────────────
+  // ── 8 · Offline First ───────────────────────
   {
     id: 'offline',
     icon: <CloudOff className="h-10 w-10" />,
@@ -137,18 +150,7 @@ const SLIDES: OnboardingSlide[] = [
     gradient: 'from-[#7FA58A]/20 to-[#7FA58A]/5',
     accentColor: 'text-[#7FA58A]',
   },
-  // ── 8 · Reportes (placeholder) ──────────────
-  {
-    id: 'reports',
-    icon: <BarChart3 className="h-10 w-10" />,
-    badge: 'Próximamente',
-    title: 'Reportes & Análisis',
-    subtitle: 'Visualizá tu salud financiera',
-    body: 'Gráficos claros y resúmenes mensuales para entender tus hábitos financieros de un vistazo. Tomar decisiones informadas nunca fue tan sencillo.\n\n¡Muy pronto disponible!',
-    gradient: 'from-[#7FA58A]/20 to-[#7FA58A]/5',
-    accentColor: 'text-[#7FA58A]',
-  },
-  // ── 6 · Final ───────────────────────────────
+  // ── 9 · Final ───────────────────────────────
   {
     id: 'ready',
     icon: <Sparkles className="h-10 w-10" />,
