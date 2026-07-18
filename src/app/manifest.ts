@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'KADOSH',
     short_name: 'KADOSH',
     description: 'Administrá con sabiduría. Aplicación de finanzas personales basada en principios bíblicos.',
-    start_url: '/home',
+    start_url: '/',
     display: 'standalone',
     background_color: '#FAF9F7',
     theme_color: '#FAF9F7',
