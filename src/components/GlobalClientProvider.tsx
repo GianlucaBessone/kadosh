@@ -1,4 +1,53 @@
-'use client';
+'use client';export function GlobalClientProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    // Start Projection Engine (Reactive Loop for Event Sourcing)
+    import('@/lib/crypto/ProjectionRecoveryManager').then(({ ProjectionRecoveryManager }) => {
+      ProjectionRecoveryManager.init();
+      ProjectionRecoveryManager.triggerRecovery('App Startup');
+    });
+
+    // Check and claim workspace before starting sync engine
+    import('@/services/WorkspaceAssociationService').then(({ WorkspaceAssociationService }) => {
+      WorkspaceAssociationService.checkAndClaimWorkspace().finally(() => {
+        // Solo iniciar el motor de sincronización si hay conexión
+        if (navigator.onLine) {
+          syncEngine.start();
+        } else {
+          // Escuchar evento de conexión para iniciar la sincronización cuando haya conexión
+          window.addEventListener('online', () => {
+            syncEngine.start();
+          });
+        }
+      });
+    });
+
+    // Init Daily Verses
+    DailyVerseService.initializeDatabase();
+    
+    // Init SoundService configuration
+    soundService.reloadSettings();
+
+    return () => {
+      syncEngine.stop();
+    };
+  }, []);
+
+  return (
+    <Profiler id="GlobalClientProvider" onRender={onRenderCallback}>
+      <TooltipProvider>
+        <Suspense fallback={null}>
+          <NavigationProfiler />
+        </Suspense>
+        <ThemeApplier />
+        <GlobalDevInfoWatcher />
+        <AuthGuard>
+          {children}
+        </AuthGuard>
+        <Toaster />
+      </TooltipProvider>
+    </Profiler>
+  );
+}
 
 import { useCallback, useEffect, useRef, useState, Suspense } from 'react';
 import { syncEngine } from '@/services/syncEngine';
@@ -6,6 +55,7 @@ import { isAppUnlocked, hasLocalPin } from '@/features/auth/localAuth';
 import { useRouter, usePathname } from 'next/navigation';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
+import { hasSeenOnboarding } from '@/components/onboarding/OnboardingModal';
 
 import { DailyVerseService } from '@/features/daily-verse/service';
 import { TooltipProvider } from '@/components/ui/tooltip';
@@ -77,8 +127,14 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    // Allow access to registration for users who haven't completed onboarding
+    if (pathname === '/registro' && !hasSeenOnboarding()) {
+      markAuthVerified();
+      return;
+    }
+
     if (!hasLocalPin()) {
-      router.replace('/login?setup=true');
+      router.replace('/login');
       return;
     }
 
@@ -125,56 +181,4 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   if (typeof window === 'undefined' || !isAuthVerified) return null;
 
   return <>{children}</>;
-}
-
-
-export function GlobalClientProvider({ children }: { children: React.ReactNode }) {
-  useEffect(() => {
-    // Start Projection Engine (Reactive Loop for Event Sourcing)
-    import('@/lib/crypto/ProjectionRecoveryManager').then(({ ProjectionRecoveryManager }) => {
-      ProjectionRecoveryManager.init();
-      ProjectionRecoveryManager.triggerRecovery('App Startup');
-    });
-
-    // Check and claim workspace before starting sync engine
-    import('@/services/WorkspaceAssociationService').then(({ WorkspaceAssociationService }) => {
-      WorkspaceAssociationService.checkAndClaimWorkspace().finally(() => {
-        // Solo iniciar el motor de sincronización si hay conexión
-        if (navigator.onLine) {
-          syncEngine.start();
-        } else {
-          // Escuchar evento de conexión para iniciar la sincronización cuando haya conexión
-          window.addEventListener('online', () => {
-            syncEngine.start();
-          });
-        }
-      });
-    });
-
-    // Init Daily Verses
-    DailyVerseService.initializeDatabase();
-    
-    // Init SoundService configuration
-    soundService.reloadSettings();
-
-    return () => {
-      syncEngine.stop();
-    };
-  }, []);
-
-  return (
-    <Profiler id="GlobalClientProvider" onRender={onRenderCallback}>
-      <TooltipProvider>
-        <Suspense fallback={null}>
-          <NavigationProfiler />
-        </Suspense>
-        <ThemeApplier />
-        <GlobalDevInfoWatcher />
-        <AuthGuard>
-          {children}
-        </AuthGuard>
-        <Toaster />
-      </TooltipProvider>
-    </Profiler>
-  );
 }
