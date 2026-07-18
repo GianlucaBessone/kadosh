@@ -32,15 +32,19 @@ for (const entry of defaultCache) {
 }
 
 // Definir rutas específicas para precacheo que deben estar disponibles offline
+// Actualizado para reflejar el nuevo flujo de bootstrap
 const criticalRoutes = [
   "/",
-  "/login",
+  "/login", 
   "/home",
   "/registro",
   "/welcome",
   "/_next/static/chunks/app/layout-bb6cde704e7f2cb2.js",
   "/_next/static/chunks/app/(main)/layout-9c928af083522b4c.js",
   "/_next/static/chunks/app/(main)/template-eff60b26f5709b70.js",
+  // Añadir rutas críticas para el nuevo flujo de bootstrap
+  "/_next/static/chunks/pages/index.*.js",
+  "/_next/static/chunks/app/page.*.js",
 ];
 
 // Agregar rutas críticas al precache si no están ya incluidas
@@ -57,6 +61,15 @@ for (const route of criticalRoutes) {
     precacheEntries.push(route);
   }
 }
+
+// Forzar skipWaiting y clientsClaim para asegurar actualización
+self.addEventListener("install", () => {
+  self.skipWaiting();
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
 
 const serwist = new Serwist({
   precacheEntries: precacheEntries,
