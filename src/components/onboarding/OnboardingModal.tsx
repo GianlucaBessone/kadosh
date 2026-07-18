@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Leaf,
@@ -40,6 +40,13 @@ interface OnboardingSlide {
   accentColor: string;       // Tailwind text-* for highlighted text
   isLast?: boolean;
 }
+
+// ─────────────────────────────────────────────
+// Audio constants
+// ─────────────────────────────────────────────
+const AUDIO_FADE_DURATION = 4000; // 2 seconds for fade in/out
+const AUDIO_VOLUME = 0.5; // 50% volume for optimal listening experience
+const AUDIO_PATH = '/sounds/stars.m4a'; // Path to the background music file
 
 // ─────────────────────────────────────────────
 // Slides definition
@@ -112,7 +119,7 @@ const SLIDES: OnboardingSlide[] = [
     badge: 'Comunidad',
     title: 'Nunca administrás solo',
     subtitle: 'Una comunidad que ora contigo',
-    body: 'En KADOSH podés pedir oración por tu economía para que otros creyentes te acompañen delante de Dios, y también dedicar unos minutos para orar por quienes atraviesan situaciones similares.',
+    body: 'En KADOSH podés pedir oración por tu economía para que otros creyentes te acompañen delante de God, y también dedicar unos minutos para orar por quienes atraviesan situaciones similares.',
     verseRef: 'Gálatas 6:2 (NVI)',
     gradient: 'from-[#CFAF7A]/20 to-[#CFAF7A]/5',
     accentColor: 'text-[#CFAF7A]',
@@ -215,8 +222,134 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
   const [startTour, setStartTour] = useState(false);
   const [showPWAInstall, setShowPWAInstall] = useState(false);
   const [pendingAction, setPendingAction] = useState<'enter' | 'tour' | null>(null);
+  
+  // Refs for audio management
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const isPlayingRef = useRef(false);
+  const fadeTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const { isIOS, isStandalone, deferredPrompt, promptInstall } = usePWA();
+
+  // Initialize audio element
+  useEffect(() => {
+    // Create audio element if it doesn't exist
+    if (!audioRef.current) {
+      audioRef.current = new Audio(AUDIO_PATH);
+      audioRef.current.volume = 0; // Start muted for autoplay compliance
+      audioRef.current.loop = true; // Loop the background music
+    }
+
+    // Cleanup audio on unmount
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (fadeTimeoutRef.current) {
+        clearTimeout(fadeTimeoutRef.current);
+        fadeTimeoutRef.current = null;
+      }
+    };
+  }, []);
+
+  // Handle autoplay restrictions by playing on first user interaction
+  useEffect(() => {
+    if (!visible || !audioRef.current || isPlayingRef.current) return;
+
+    const playAudioWithFallback = async () => {
+      try {
+        // Try to play immediately (for browsers that allow autoplay)
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        await audioRef.current!.play();
+        isPlayingRef.current = true;
+        startFadeIn(); // Start fade-in effect
+      } catch (error) {
+        // If autoplay is blocked, wait for user interaction to play
+        console.log("Autoplay blocked, waiting for user interaction");
+      }
+    };
+
+    playAudioWithFallback();
+  }, [visible]);
+
+  // Function to start fade-in effect
+  const startFadeIn = useCallback(() => {
+    if (!audioRef.current) return;
+
+    // Reset timeout if already running
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+    }
+
+    // Set isPlayingRef to true after we start the fade
+    isPlayingRef.current = true;
+    audioRef.current.volume = 0;
+    
+    // Gradually increase volume over time
+    const startTime = Date.now();
+    const fadeInInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / AUDIO_FADE_DURATION, 1); // Normalize to 0-1
+      audioRef.current!.volume = progress * AUDIO_VOLUME;
+
+      if (progress >= 1) {
+        clearInterval(fadeInInterval);
+        audioRef.current!.volume = AUDIO_VOLUME;
+      }
+    }, 50); // Update every 50ms for smooth transition
+  }, []);
+
+  // Function to start fade-out effect
+  const startFadeOut = useCallback(() => {
+    if (!audioRef.current || !isPlayingRef.current) return;
+
+    // Reset timeout if already running
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+    }
+
+    // Gradually decrease volume over time
+    const startTime = Date.now();
+    const fadeOutInterval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const progress = Math.min(elapsed / AUDIO_FADE_DURATION, 1); // Normalize to 0-1
+      audioRef.current!.volume = AUDIO_VOLUME * (1 - progress);
+
+      if (progress >= 1) {
+        clearInterval(fadeOutInterval);
+        audioRef.current!.pause();
+        audioRef.current!.currentTime = 0; // Reset to beginning
+        isPlayingRef.current = false;
+      }
+    }, 50); // Update every 50ms for smooth transition
+  }, []);
+
+  // Function to stop audio completely
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+      audioRef.current.volume = 0;
+      isPlayingRef.current = false;
+    }
+    if (fadeTimeoutRef.current) {
+      clearTimeout(fadeTimeoutRef.current);
+      fadeTimeoutRef.current = null;
+    }
+  }, []);
+
+  // Play audio on user interaction if autoplay was blocked
+  const handleUserInteraction = useCallback(async () => {
+    if (!audioRef.current || isPlayingRef.current) return;
+
+    try {
+      await audioRef.current.play();
+      isPlayingRef.current = true;
+      startFadeIn();
+    } catch (error) {
+      console.error("Failed to play audio:", error);
+    }
+  }, [startFadeIn]);
 
   // Check on mount
   useEffect(() => {
@@ -226,6 +359,14 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
       return () => clearTimeout(t);
     }
   }, []);
+
+  // Handle fade out when reaching the last slide
+  useEffect(() => {
+    const slide = SLIDES[index];
+    if (slide.isLast && isPlayingRef.current) {
+      startFadeOut();
+    }
+  }, [index, startFadeOut]);
 
   const slide = SLIDES[index];
   const isFirst = index === 0;
@@ -240,19 +381,21 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
   const goSkip = useCallback(() => {
     markOnboardingDone();
     setVisible(false);
+    stopAudio(); // Stop audio when skipping
     onComplete?.();
-  }, [onComplete]);
+  }, [onComplete, stopAudio]);
 
   const finishOnboarding = useCallback(
     (action: 'enter' | 'tour') => {
       setVisible(false);
+      stopAudio(); // Stop audio when finishing
       if (action === 'tour') {
         setStartTour(true);
         // TODO: launch interactive tour
       }
       onComplete?.();
     },
-    [onComplete]
+    [onComplete, stopAudio]
   );
 
   const handleAction = useCallback(
@@ -277,8 +420,15 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
     [isStandalone, deferredPrompt, isIOS, finishOnboarding]
   );
 
-  const handleEnter = useCallback(() => handleAction('enter'), [handleAction]);
-  const handleTour = useCallback(() => handleAction('tour'), [handleAction]);
+  const handleEnter = useCallback(() => {
+    handleUserInteraction(); // Try to play audio if not already playing
+    handleAction('enter');
+  }, [handleAction, handleUserInteraction]);
+
+  const handleTour = useCallback(() => {
+    handleUserInteraction(); // Try to play audio if not already playing
+    handleAction('tour');
+  }, [handleAction, handleUserInteraction]);
 
   const closePWAPrompt = useCallback(() => {
     try {
@@ -316,10 +466,16 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
     setDragStartX(null);
   };
 
-  const onTouchStart = (e: React.TouchEvent) => setDragStartX(e.touches[0].clientX);
+  const onTouchStart = (e: React.TouchEvent) => {
+    handleUserInteraction(); // Try to play audio on touch interaction
+    setDragStartX(e.touches[0].clientX);
+  };
   const onTouchEnd = (e: React.TouchEvent) => handleSwipe(e.changedTouches[0].clientX);
 
-  const onMouseDown = (e: React.MouseEvent) => setDragStartX(e.clientX);
+  const onMouseDown = (e: React.MouseEvent) => {
+    handleUserInteraction(); // Try to play audio on mouse interaction
+    setDragStartX(e.clientX);
+  };
   const onMouseUp = (e: React.MouseEvent) => handleSwipe(e.clientX);
 
   if (!visible) return null;

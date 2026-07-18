@@ -12,7 +12,6 @@ import { TooltipProvider } from '@/components/ui/tooltip';
 import { Profiler } from 'react';
 import { onRenderCallback } from '@/lib/performance/ReactRenderProfiler';
 import { NavigationProfiler } from '@/lib/performance/NavigationProfiler';
-import { OnboardingModal } from '@/components/onboarding/OnboardingModal';
 import { soundService } from '@/lib/SoundService';
 import { Toaster } from '@/components/ui/sonner';
 import { GlobalDevInfoWatcher } from '@/components/GlobalDevInfoWatcher';
@@ -128,11 +127,6 @@ function AuthGuard({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function OnboardingWrapper() {
-  const pathname = usePathname();
-  if (pathname === '/welcome') return null;
-  return <OnboardingModal />;
-}
 
 export function GlobalClientProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
@@ -177,7 +171,6 @@ export function GlobalClientProvider({ children }: { children: React.ReactNode }
         <ThemeApplier />
         <GlobalDevInfoWatcher />
         <AuthGuard>
-          <OnboardingWrapper />
           {children}
         </AuthGuard>
         <Toaster />
