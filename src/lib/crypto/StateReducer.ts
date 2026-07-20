@@ -373,6 +373,7 @@ export class StateReducer {
                 message: payload.message,
                 status: 'ACTIVE',
                 prayerCount: 0,
+                joinedCount: 0,
                 createdAt: payload.createdAt,
                 updatedAt: payload.createdAt,
                 expiresAt: payload.expiresAt,
@@ -386,16 +387,34 @@ export class StateReducer {
                 id: payload.interactionId,
                 prayerRequestId: payload.prayerRequestId,
                 userId: payload.userId,
+                type: payload.type,
                 createdAt: payload.createdAt
               });
 
               const request = await db.prayerRequests.get(payload.prayerRequestId);
               if (request) {
                 await db.prayerRequests.update(payload.prayerRequestId, {
-                  prayerCount: (request.prayerCount || 0) + 1,
+                  prayerCount: payload.type === 'PRAYED' ? (request.prayerCount || 0) + 1 : request.prayerCount,
+                  joinedCount: payload.type === 'JOINED' ? (request.joinedCount || 0) + 1 : request.joinedCount,
                   updatedAt: payload.createdAt
                 });
               }
+              break;
+            }
+
+            case 'PrayerRequestCancelled': {
+              await db.prayerRequests.update(payload.prayerRequestId, {
+                status: 'ARCHIVED',
+                archivedAt: payload.cancelledAt,
+                updatedAt: payload.cancelledAt
+              });
+              break;
+            }
+
+            case 'PrayerRequestDeleted': {
+              await db.prayerRequests.delete(payload.prayerRequestId);
+              const interactionIds = await db.prayerInteractions.where('prayerRequestId').equals(payload.prayerRequestId).primaryKeys();
+              await db.prayerInteractions.bulkDelete(interactionIds);
               break;
             }
 

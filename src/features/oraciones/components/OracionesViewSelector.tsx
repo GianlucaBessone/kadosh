@@ -22,7 +22,7 @@ const OPTIONS: ViewOption[] = [
     id: 'pedir',
     icon: HelpingHand,
     label: 'Pedir oración',
-    description: 'Comparte tu necesidad con la comunidad',
+    description: 'Comparte tu petición con la comunidad',
   },
   {
     id: 'orar',

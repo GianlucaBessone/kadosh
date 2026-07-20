@@ -1,5 +1,6 @@
 import { db } from '@/lib/db';
 import { soundService } from '@/lib/SoundService';
+import { processSyncQueue } from '@/services/syncQueueService';
 
 export class SyncEngine {
   private isSyncing = false;
@@ -7,24 +8,6 @@ export class SyncEngine {
 
   async start(intervalMs: number = 30000) {
     if (typeof window === 'undefined') return;
-
-    const user = await db.users.orderBy('id').first();
-    if (!user || !user.isCloudLinked) {
-      console.log('Sync disabled: no cloud account linked in local DB.');
-      return;
-    }
-
-    if (user.isEmailConfirmed === false) {
-      console.log('Sync disabled: email not confirmed yet.');
-      return;
-    }
-
-    // Only sync if user has a linked cloud account (Supabase session cookie exists)
-    const hasSupabaseSession = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
-    if (!hasSupabaseSession) {
-      console.log('Sync disabled: no cloud account linked (no cookie).');
-      return;
-    }
 
     // Listen to online events
     window.addEventListener('online', this.sync);
@@ -58,8 +41,23 @@ export class SyncEngine {
 
     this.isSyncing = true;
     try {
-      await this.pushChanges();
-      await this.pullChanges();
+      // 1. Siempre procesar la cola REST (peticiones de oración, invitados, etc.)
+      await processSyncQueue();
+
+      // 2. Comprobar si el usuario tiene cuenta en la nube para sincronizar E2EE (Finanzas)
+      const user = await db.users.orderBy('id').first();
+      const hasSupabaseSession = document.cookie.split(';').some(c => c.trim().startsWith('sb-'));
+      
+      const canSyncCloud = 
+        user && 
+        user.isCloudLinked && 
+        user.isEmailConfirmed !== false && 
+        hasSupabaseSession;
+
+      if (canSyncCloud) {
+        await this.pushChanges();
+        await this.pullChanges();
+      }
     } catch (error: any) {
       if (error instanceof TypeError && (error.message === 'Failed to fetch' || error.message === 'Load failed')) {
         console.log('Sync paused: device is offline or server unreachable.');

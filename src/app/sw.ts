@@ -2,6 +2,7 @@
 import { defaultCache } from "@serwist/next/worker";
 import type { PrecacheEntry, SerwistGlobalConfig } from "serwist";
 import { Serwist } from "serwist";
+import { CacheFirst, NetworkFirst, ExpirationPlugin } from "serwist";
 
 declare global {
   interface WorkerGlobalScope extends SerwistGlobalConfig {
@@ -11,72 +12,55 @@ declare global {
 
 declare const self: ServiceWorkerGlobalScope;
 
-// Inyectamos nuestro plugin anti-redirecciones a todas las estrategias de Next.js
-// Esto permite que Serwist mantenga su lógica de App Router para rutas estáticas (como /tithe)
-// pero impide que se cachee la redirección del login.
-for (const entry of defaultCache) {
-  if (entry.handler && typeof entry.handler === 'object') {
-    const handler = entry.handler as any;
-    if (!handler.plugins) {
-      handler.plugins = [];
-    }
-    handler.plugins.push({
-      cacheWillUpdate: async ({ response }: any) => {
-        if (response.redirected || response.url.includes('/login')) {
-          return null; // Rechazar
-        }
-        return response; // Aceptar
-      }
-    });
-  }
-}
+const serwist = new Serwist({
+  precacheEntries: self.__SW_MANIFEST || [],
+  skipWaiting: true,
+  clientsClaim: true,
+  navigationPreload: true,
 
-// Definir rutas específicas para precacheo que deben estar disponibles offline
-// Actualizado para reflejar el nuevo flujo de bootstrap
-const criticalRoutes = [
-  "/",
-  "/login", 
-  "/home",
-  "/registro",
-  "/welcome",
-  "/_next/static/chunks/app/layout-bb6cde704e7f2cb2.js",
-  "/_next/static/chunks/app/(main)/layout-9c928af083522b4c.js",
-  "/_next/static/chunks/app/(main)/template-eff60b26f5709b70.js",
-  // Añadir rutas críticas para el nuevo flujo de bootstrap
-  "/_next/static/chunks/pages/index.*.js",
-  "/_next/static/chunks/app/page.*.js",
-];
+  runtimeCaching: [
+    ...defaultCache,
 
-// Agregar rutas críticas al precache si no están ya incluidas
-const precacheEntries = self.__SW_MANIFEST || [];
-for (const route of criticalRoutes) {
-  const exists = precacheEntries.some(entry => {
-    if (typeof entry === 'string') {
-      return entry === route;
-    } else {
-      return entry.url === route;
-    }
-  });
-  if (!exists) {
-    precacheEntries.push(route);
-  }
-}
+    // Catch-all para navegación (lo más amplio posible)
+    {
+      matcher: ({ request }) => request.mode === "navigate",
+      handler: new NetworkFirst({
+        cacheName: "navigation",
+        plugins: [new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 30 * 86400 })],
+      }),
+    },
 
-// Forzar skipWaiting y clientsClaim para asegurar actualización
-self.addEventListener("install", () => {
-  self.skipWaiting();
+    // Rutas específicas de tu app
+    {
+      matcher: ({ url }) => 
+        ["/login", "/registro", "/home", "/welcome", "/profile", "/tithe", "/seeds", "/planning", "/register-tx", "/asistencia", "/oraciones"]
+          .some(path => url.pathname === path || url.pathname.startsWith(path)),
+      handler: new NetworkFirst({
+        cacheName: "app-routes",
+        plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 7 * 86400 })],
+      }),
+    },
+
+    // Assets críticos
+    {
+      matcher: ({ url }) => 
+        url.pathname.includes("/sounds/") || 
+        url.pathname.includes("/_next/static/") || 
+        url.pathname.includes("/icon-"),
+      handler: new CacheFirst({
+        cacheName: "critical-assets",
+        plugins: [new ExpirationPlugin({ maxEntries: 150, maxAgeSeconds: 60 * 86400 })],
+      }),
+    },
+  ],
+});
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
 });
 
 self.addEventListener("activate", (event) => {
   event.waitUntil(self.clients.claim());
-});
-
-const serwist = new Serwist({
-  precacheEntries: precacheEntries,
-  skipWaiting: true,
-  clientsClaim: true,
-  navigationPreload: true,
-  runtimeCaching: defaultCache,
 });
 
 serwist.addEventListeners();

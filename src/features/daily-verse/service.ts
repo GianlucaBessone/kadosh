@@ -34,13 +34,24 @@ export class DailyVerseService {
     const oneDay = 1000 * 60 * 60 * 24;
     const dayOfYear = Math.floor(diff / oneDay); // 1-365
 
-    const verse = await db.dailyVerses.where('dayOfYear').equals(dayOfYear).first();
-    
-    // Si por alguna razón no hay versículo para ese día (ej. año bisiesto día 366), devolver el 1
-    if (!verse) {
-       return await db.dailyVerses.where('dayOfYear').equals(1).first() || null;
+    let verse;
+    try {
+      verse = await db.dailyVerses.where('dayOfYear').equals(dayOfYear).first();
+      
+      // Si por alguna razón no hay versículo para ese día (ej. año bisiesto día 366), devolver el 1
+      if (!verse) {
+         verse = await db.dailyVerses.where('dayOfYear').equals(1).first();
+      }
+    } catch (error) {
+      console.warn('Error reading from dailyVerses DB, using in-memory fallback:', error);
     }
     
-    return verse;
+    if (!verse) {
+      // Fallback in case the DB is empty (e.g. QuotaExceededError during initialization)
+      const verses = getSeedVerses();
+      verse = verses.find(v => v.dayOfYear === dayOfYear) || verses[0];
+    }
+    
+    return verse as DailyVerse | null;
   }
 }

@@ -22,15 +22,16 @@ export async function GET(req: Request) {
       if (excludeUserId && excludeUserId !== 'null' && excludeUserId !== 'undefined') {
         where.userId = { not: excludeUserId };
       }
-      // Para stats de comunidad, no aplicar filtro de workspaceId para mostrar peticiones comunitarias
-      if (workspaceIdParam && workspaceIdParam !== 'null' && workspaceIdParam !== 'undefined' && workspaceIdParam !== 'COMMUNITY') {
-        where.workspaceId = workspaceIdParam;
-      } else if (workspaceIdParam === 'COMMUNITY') {
-        // Si se solicita el workspace COMMUNITY, mostrar todas excepto las específicas de workspace
-        where.workspaceId = null; // Solo peticiones sin workspace (comunitarias)
-      }
-      const activeCount = await prisma.prayerRequest.count({ where });
-      return NextResponse.json({ activeCount });
+      // Solo peticiones sin workspace (comunitarias)
+      where.workspaceId = null;
+      
+      const uniqueUsers = await prisma.prayerRequest.findMany({
+        where,
+        select: { userId: true },
+        distinct: ['userId'],
+      });
+      
+      return NextResponse.json({ activeCount: uniqueUsers.length });
     }
 
     if (!userId || userId === 'null' || userId === 'undefined') {
@@ -39,13 +40,8 @@ export async function GET(req: Request) {
 
     if (scope === 'mine') {
       const whereCondition: any = { userId };
-      // Validar que workspaceIdParam no sea null o "null" antes de usarlo
-      if (workspaceIdParam && workspaceIdParam !== 'null' && workspaceIdParam !== 'COMMUNITY') {
-        whereCondition.workspaceId = workspaceIdParam;
-      } else if (workspaceIdParam === 'COMMUNITY') {
-        // Para peticiones mías en el contexto comunitario, mostrar solo las sin workspace
-        whereCondition.workspaceId = null;
-      }
+      // Para peticiones mías en el contexto comunitario, mostrar solo las sin workspace
+      whereCondition.workspaceId = null;
       
       const requests = await prisma.prayerRequest.findMany({
         where: whereCondition,
@@ -60,6 +56,7 @@ export async function GET(req: Request) {
             message: r.message,
             status: r.status,
             prayerCount: r.prayerCount,
+            joinedCount: r.joinedCount,
             createdAt: r.createdAt.toISOString(),
             expiresAt: r.expiresAt.toISOString(),
             archivedAt: null,
@@ -72,6 +69,7 @@ export async function GET(req: Request) {
             message: r.message,
             status: r.status,
             prayerCount: r.prayerCount,
+            joinedCount: r.joinedCount,
             createdAt: r.createdAt.toISOString(),
             expiresAt: r.expiresAt.toISOString(),
             archivedAt: r.archivedAt?.toISOString() ?? r.expiresAt.toISOString(),
@@ -91,15 +89,8 @@ export async function GET(req: Request) {
         whereCondition.userId = { not: userId };
       }
       
-      // Para peticiones comunitarias, permitir que se muestren peticiones sin workspace
-      // o peticiones de cualquier workspace si no se especifica uno particular
-      if (workspaceIdParam && workspaceIdParam !== 'null' && workspaceIdParam !== 'undefined' && workspaceIdParam !== 'COMMUNITY') {
-        whereCondition.workspaceId = workspaceIdParam;
-      } else if (workspaceIdParam === 'COMMUNITY') {
-        // Mostrar peticiones comunitarias (sin workspace específico)
-        whereCondition.workspaceId = null;
-      }
-      // Si no se especifica workspaceId o es COMMUNITY, mostrar todas las peticiones públicas
+      // Mostrar peticiones comunitarias (sin workspace específico)
+      whereCondition.workspaceId = null;
       
       const requests = await prisma.prayerRequest.findMany({
         where: whereCondition,
@@ -107,7 +98,7 @@ export async function GET(req: Request) {
           user: { select: { name: true, lastName: true } },
           interactions: {
             where: { userId },
-            select: { id: true },
+            select: { id: true, type: true },
           },
         },
         orderBy: { createdAt: 'desc' },
@@ -120,24 +111,30 @@ export async function GET(req: Request) {
           message: r.message,
           status: r.status as 'ACTIVE',
           prayerCount: r.prayerCount,
+          joinedCount: r.joinedCount,
           createdAt: r.createdAt.toISOString(),
           expiresAt: r.expiresAt.toISOString(),
           archivedAt: null,
           daysRemaining: getDaysRemaining(r.expiresAt),
           authorDisplayName: displayName,
           authorInitial: initial,
-          hasPrayed: r.interactions.length > 0,
+          hasPrayed: r.interactions.some(i => i.type === 'PRAYED'),
+          hasJoined: r.interactions.some(i => i.type === 'JOINED'),
         };
       });
 
       const activeCount = items.length;
       const prayedCount = items.filter(i => i.hasPrayed).length;
+      const unaccompaniedCount = items.filter(i => !i.hasJoined).length;
+      const accompaniedCount = items.filter(i => i.hasJoined).length;
       const pendingCount = activeCount - prayedCount;
 
       return NextResponse.json({
-        summary: { activeCount, pendingCount, prayedCount },
+        summary: { activeCount, pendingCount, prayedCount, unaccompaniedCount, accompaniedCount },
         pending: items.filter(i => !i.hasPrayed),
         prayed: items.filter(i => i.hasPrayed),
+        unaccompanied: items.filter(i => !i.hasJoined),
+        accompanied: items.filter(i => i.hasJoined),
       });
     }
 
@@ -151,7 +148,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
   try {
     const body = await req.json();
-    const { userId, workspaceId, message, name, lastName } = body;
+    const { id, userId, message, name, lastName } = body;
+
 
     if (!userId || !message?.trim()) {
       return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 });
@@ -171,7 +169,7 @@ export async function POST(req: Request) {
         data: {
           id: userId,
           email: `guest-${userId}@local.kadosh`,
-          name: name || 'Usuario',
+          name: name || null,
           lastName: lastName || null,
         },
       });
@@ -197,11 +195,26 @@ export async function POST(req: Request) {
     }
 
     const now = new Date();
+    
+    // Idempotency: Si ya existe, retornamos success
+    if (id) {
+      const existing = await prisma.prayerRequest.findUnique({ where: { id } });
+      if (existing) {
+        return NextResponse.json({
+          success: true,
+          alreadyCreated: true,
+          id: existing.id,
+          expiresAt: existing.expiresAt.toISOString(),
+        });
+      }
+    }
+
     const request = await prisma.prayerRequest.create({
       data: {
+        id: id || undefined,
         userId,
-        // Para peticiones comunitarias, establecer workspaceId como null
-        workspaceId: workspaceId === 'COMMUNITY' ? null : (workspaceId || null),
+        // Todas las peticiones del módulo son comunitarias por diseño
+        workspaceId: null,
         message: trimmed,
         status: 'ACTIVE',
         prayerCount: 0,

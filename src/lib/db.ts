@@ -190,6 +190,28 @@ export interface Tithe {
   deletedAt: string | null;
 }
 
+export interface PrayerRequest {
+  id: string;
+  workspaceId: string | null;
+  userId: string;
+  message: string;
+  status: 'ACTIVE' | 'ARCHIVED';
+  prayerCount: number;
+  joinedCount: number;
+  createdAt: string;
+  updatedAt: string;
+  expiresAt: string;
+  archivedAt: string | null;
+}
+
+export interface PrayerInteraction {
+  id: string;
+  prayerRequestId: string;
+  userId: string;
+  type: 'PRAYED' | 'JOINED';
+  createdAt: string;
+}
+
 // ─── E2EE & Event Sourcing Interfaces ───────────────────────────────────────
 
 export interface Device {
@@ -347,25 +369,6 @@ export interface CommitmentPayment {
   deletedAt: string | null;
 }
 
-export interface PrayerRequest {
-  id: string;
-  workspaceId: string;
-  userId: string;
-  message: string;
-  status: 'ACTIVE' | 'ARCHIVED';
-  prayerCount: number;
-  createdAt: string;
-  updatedAt: string;
-  expiresAt: string;
-  archivedAt: string | null;
-}
-
-export interface PrayerInteraction {
-  id: string;
-  prayerRequestId: string;
-  userId: string;
-  createdAt: string;
-}
 
 export interface Notification {
   id: string;
@@ -449,6 +452,48 @@ export class KadoshDB extends Dexie {
 
   constructor() {
     super('KadoshDB');
+    // ==================== VERSIÓN ACTUAL (16) ====================
+    this.version(16).stores({
+      users: 'id, email, isCloudLinked',
+      settings: 'id, userId',
+      workspaces: 'id, ownerId',
+      workspaceMembers: 'id, workspaceId, userId',
+      devices: 'id, userId, trusted',
+      workspaceKeys: 'id, workspaceId',
+      deviceWorkspaceKeys: 'id, workspaceKeyId, deviceId',
+      workspaceEvents: 'id, workspaceId, [workspaceId+sequence], aggregateId, eventType, syncStatus, createdAt',
+      workspaceSnapshots: 'id, workspaceId, createdAt',
+      dailyVerses: 'id, dayOfYear',
+      notifications: 'id, userId, read',
+      syncQueue: 'id, status, tableName, recordId',
+      metadata: 'id',
+      systemConfig: 'key',
+      motivationalVerses: 'id, category',
+
+      projectionState: 'workspaceId',
+      processedProjectionEvents: 'eventId, workspaceId',
+      projectionDeadLetters: 'eventId, workspaceId, sequence, status',
+      projectionHealth: 'workspaceId, status',
+      projectionMetrics: 'workspaceId',
+      projectionCheckpoints: 'workspaceId',
+
+      accounts: 'id, workspaceId, deletedAt',
+      categories: 'id, workspaceId, type, deletedAt',
+      transactions: 'id, workspaceId, accountId, categoryId, type, date, deletedAt',
+      seedGoals: 'id, workspaceId, status, deletedAt',
+      seedContributions: 'id, seedGoalId, date, deletedAt',
+      tithes: 'id, workspaceId, [month+year], deletedAt',
+      financialCommitments: 'id, ownerId, status, periodicity, type, firstDueDate, endDate, deletedAt',
+      commitmentPayments: 'id, commitmentId, status, date, deletedAt',
+
+      // === ORACIONES - ÍNDICES OPTIMIZADOS ===
+      prayerRequests: 'id, workspaceId, userId, status, expiresAt, createdAt, [workspaceId+userId], [workspaceId+status], [workspaceId+expiresAt]',
+      prayerInteractions: 'id, prayerRequestId, userId, [prayerRequestId+userId]'
+    });
+    this.version(15).stores({
+      prayerRequests: 'id, workspaceId, userId, status, expiresAt',
+      prayerInteractions: 'id, prayerRequestId, userId, [prayerRequestId+userId]'
+    });
     this.version(14).stores({
       users: 'id, email, isCloudLinked',
       settings: 'id, userId',
@@ -748,42 +793,9 @@ export class KadoshDB extends Dexie {
 export const db = new KadoshDB();
 createDexieProfiler(db);
 
+// Función para limpiar todo (útil para testing)
 export async function clearAllUserData() {
-  await db.transaction('rw', [
-    db.users, db.settings, db.workspaces, db.workspaceMembers, db.devices,
-    db.workspaceKeys, db.deviceWorkspaceKeys, db.workspaceEvents, db.workspaceSnapshots,
-    db.notifications, db.syncQueue, db.metadata, db.motivationalVerses,
-    db.projectionState, db.accounts, db.categories, db.transactions,
-    db.seedGoals, db.seedContributions, db.tithes,
-    db.financialCommitments, db.commitmentPayments, db.processedProjectionEvents,
-    db.projectionDeadLetters, db.projectionHealth, db.projectionMetrics, db.projectionCheckpoints
-  ], async () => {
-    await db.users.clear();
-    await db.settings.clear();
-    await db.workspaces.clear();
-    await db.workspaceMembers.clear();
-    await db.devices.clear();
-    await db.workspaceKeys.clear();
-    await db.deviceWorkspaceKeys.clear();
-    await db.workspaceEvents.clear();
-    await db.workspaceSnapshots.clear();
-    await db.notifications.clear();
-    await db.syncQueue.clear();
-    await db.metadata.clear();
-    await db.motivationalVerses.clear();
-    await db.projectionState.clear();
-    await db.accounts.clear();
-    await db.categories.clear();
-    await db.transactions.clear();
-    await db.seedGoals.clear();
-    await db.seedContributions.clear();
-    await db.tithes.clear();
-    await db.financialCommitments.clear();
-    await db.commitmentPayments.clear();
-    await db.processedProjectionEvents.clear();
-    await db.projectionDeadLetters.clear();
-    await db.projectionHealth.clear();
-    await db.projectionMetrics.clear();
-    await db.projectionCheckpoints.clear();
+  await db.transaction('rw', db.tables, async () => {
+    await Promise.all(db.tables.map(table => table.clear()));
   });
 }

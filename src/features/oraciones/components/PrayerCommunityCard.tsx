@@ -7,7 +7,6 @@ import { Button } from '@/components/ui/button';
 import { HelpingHand } from 'lucide-react';
 import { db } from '@/lib/db';
 import { usePrayerStats } from '@/features/oraciones/services/prayerRequestService';
-import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries';
 
 export function PrayerCommunityCard() {
   const [activeCount, setActiveCount] = useState(0);
@@ -15,8 +14,7 @@ export function PrayerCommunityCard() {
   const [rotationDirection, setRotationDirection] = useState<'up' | 'down' | null>(null);
   const [excludeUserId, setExcludeUserId] = useState<string | null>(null);
   const previousCount = useRef<number>(0);
-  const workspaceId = WorkspaceQueries.useActiveWorkspaceId();
-  const prayerCount = usePrayerStats(excludeUserId, workspaceId);
+  const prayerCount = usePrayerStats(excludeUserId);
 
   useEffect(() => {
     const loadUser = async () => {
@@ -50,13 +48,16 @@ export function PrayerCommunityCard() {
             <p className="text-sm font-semibold text-foreground">Comunidad orando</p>
             <p className="text-xs text-muted-foreground">
               <span
-                style={{
-                  transform: isRotating
-                    ? rotationDirection === 'up'
-                      ? 'perspective(140px) rotateX(-20deg)'
-                      : 'perspective(140px) rotateX(20deg)'
-                    : 'perspective(140px) rotateX(0deg)',
-                }}
+                style={
+                  isRotating
+                    ? {
+                        transform:
+                          rotationDirection === 'up'
+                            ? 'perspective(140px) rotateX(-20deg)'
+                            : 'perspective(140px) rotateX(20deg)',
+                      }
+                    : {}
+                }
                 className="inline-block transition-transform duration-200 ease-out"
               >
                 {activeCount}

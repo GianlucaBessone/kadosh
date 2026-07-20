@@ -7,10 +7,18 @@ export async function getAuthUser() {
   const supabase = await createClient()
   let user = null;
   try {
-    const { data } = await supabase.auth.getUser();
+    const { data, error } = await supabase.auth.getUser();
+    
+    if (error) {
+      // Si hay un error (como token expirado o inválido), lo logueamos como debug y retornamos null
+      // para no interrumpir el modo offline-first.
+      console.debug('Auth user not found or token invalid:', error.message);
+      return null;
+    }
+    
     user = data.user;
-  } catch (error) {
-    console.warn('Supabase auth error (ignoring for offline-first):', error);
+  } catch (error: any) {
+    console.warn('Supabase auth exception (ignoring for offline-first):', error?.message || error);
     return null;
   }
   

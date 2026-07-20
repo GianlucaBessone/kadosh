@@ -1,11 +1,11 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { addDays } from '@/features/oraciones/utils/formatDisplayName';
-import { PrayerCommandDispatcher } from '@/domain/commands/PrayerCommandDispatcher';
 import { v4 as uuidv4 } from 'uuid';
+import { addToSyncQueue } from '@/services/syncQueueService';
 import type { MyPrayerRequestDTO, PrayerRequestDTO, CommunityPrayerSummary } from '../types';
 
 const ACTIVE_DAYS = 7;
@@ -14,175 +14,183 @@ function formatPrayerRequestRow(row: any): MyPrayerRequestDTO {
   return {
     id: row.id,
     message: row.message,
-    status: new Date(row.expiresAt) > new Date() ? 'ACTIVE' : 'ARCHIVED',
+    status: row.status === 'ARCHIVED' ? 'ARCHIVED' : (new Date(row.expiresAt) > new Date() ? 'ACTIVE' : 'ARCHIVED'),
     prayerCount: row.prayerCount,
+    joinedCount: 0,
     createdAt: row.createdAt,
     expiresAt: row.expiresAt,
     archivedAt: row.archivedAt ?? row.expiresAt,
-    daysRemaining: Math.max(0, Math.ceil((new Date(row.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24)))
+    daysRemaining: Math.max(0, Math.ceil((new Date(row.expiresAt).getTime() - Date.now()) / (1000 * 60 * 60 * 24))),
+    closeReason: row.status === 'ARCHIVED' ? 'CANCELLED' : (new Date(row.expiresAt) <= new Date() ? 'EXPIRED' : undefined)
   };
 }
 
-export async function createPrayerRequest(params: { userId: string; workspaceId: string | null; message: string }) {
-  const { userId, workspaceId, message } = params;
-  if (!userId) {
-    throw new Error('Usuario no definido');
-  }
+export async function createPrayerRequest(params: { userId: string; message: string }) {
+  const { userId, message } = params;
+  if (!userId) throw new Error('Usuario no definido');
 
   const now = new Date();
   const expiresAt = addDays(now, ACTIVE_DAYS).toISOString();
-  
-  // Para peticiones comunitarias, usamos un workspace especial
-  const targetWorkspaceId = workspaceId || 'COMMUNITY';
-  
-  const command = {
-    type: 'CREATE_PRAYER_REQUEST' as const,
-    metadata: {
-      workspaceId: targetWorkspaceId, // Siempre string, COMMUNITY para peticiones generales
-      userId,
-      deviceId: 'local-device',
-      timestamp: now.toISOString()
-    },
-    payload: {
-      prayerRequestId: uuidv4(),
-      workspaceId: targetWorkspaceId, // Siempre string, COMMUNITY para peticiones generales
-      userId,
-      message: message.trim(),
-      expiresAt
-    }
-  };
+  const requestId = uuidv4();
 
-  await PrayerCommandDispatcher.dispatch(command);
-  
-  // Crear también en la base de datos central para que esté disponible inmediatamente
-  // para otros usuarios que acceden a través de la API
-  try {
-    const response = await fetch('/api/prayer-requests', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        userId,
-        // Pasar COMMUNITY como workspaceId para indicar que es una petición comunitaria
-        workspaceId: workspaceId || 'COMMUNITY',
-        message: message.trim(),
-      }),
-    });
-    
-    if (!response.ok) {
-      console.error('Error creando petición de oración en la base de datos central:', await response.text());
-    }
-  } catch (error) {
-    console.error('Error de red creando petición de oración en la base de datos central:', error);
-  }
+  // Guardamos inmediatamente en Dexie (Optimistic UI)
+  await db.prayerRequests.put({
+    id: requestId,
+    workspaceId: null, // REST no requiere COMMUNITY
+    userId,
+    message: message.trim(),
+    status: 'ACTIVE',
+    prayerCount: 0,
+    joinedCount: 0,
+    createdAt: now.toISOString(),
+    expiresAt,
+    updatedAt: now.toISOString(),
+    archivedAt: null,
+  });
+
+  // Obtenemos el nombre real del usuario de Dexie para enviarlo
+  const user = await db.users.get(userId);
+  const name = user?.name || undefined;
+  const lastName = user?.lastName || undefined;
+
+  // Encolamos la petición REST en SyncQueue
+  await addToSyncQueue('prayerRequests', requestId, 'INSERT', {
+    id: requestId,
+    userId,
+    message: message.trim(),
+    name,
+    lastName,
+  }, { endpoint: '/api/prayer-requests', method: 'POST' });
 }
 
-export async function prayForRequest(requestId: string, userId: string, workspaceId: string | null) {
-  const targetWorkspaceId = workspaceId || 'COMMUNITY';
+export async function cancelPrayerRequest(requestId: string, userId: string) {
+  if (!userId) throw new Error('Usuario no definido');
+
+  const req = await db.prayerRequests.get(requestId);
+  if (!req || req.userId !== userId) return;
+
+  // Actualizamos Dexie (Optimistic UI)
+  await db.prayerRequests.update(requestId, {
+    status: 'ARCHIVED',
+    archivedAt: new Date().toISOString()
+  });
+
+  // Encolamos cancelación REST
+  await addToSyncQueue('prayerRequests', requestId, 'DELETE', { userId }, { endpoint: `/api/prayer-requests/${requestId}/cancel`, method: 'POST' });
+}
+
+export async function prayForRequest(requestId: string, userId: string) {
+  const interactionId = uuidv4();
   
-  const command = {
-    type: 'PRAY_FOR_REQUEST' as const,
-    metadata: {
-      workspaceId: targetWorkspaceId,
-      userId,
-      deviceId: 'local-device',
-      timestamp: new Date().toISOString()
-    },
-    payload: {
+  // Verificamos si ya oramos localmente
+  const existing = await db.prayerInteractions.get({ prayerRequestId: requestId, userId, type: 'PRAYED' });
+  if (existing) return;
+
+  // Actualizamos Dexie (Optimistic UI)
+  await db.transaction('rw', db.prayerRequests, db.prayerInteractions, async () => {
+    await db.prayerInteractions.put({
+      id: interactionId,
       prayerRequestId: requestId,
       userId,
-      interactionId: uuidv4()
-    }
-  };
-
-  await PrayerCommandDispatcher.dispatch(command);
-  
-  // También registrar la oración en la base de datos central
-  try {
-    const response = await fetch(`/api/prayer-requests/${requestId}/pray`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ userId }),
+      type: 'PRAYED',
+      createdAt: new Date().toISOString()
     });
     
-    if (!response.ok) {
-      console.error('Error registrando oración en la base de datos central:', await response.text());
+    const req = await db.prayerRequests.get(requestId);
+    if (req) {
+      await db.prayerRequests.update(requestId, {
+        prayerCount: (req.prayerCount || 0) + 1
+      });
     }
-  } catch (error) {
-    console.error('Error de red registrando oración en la base de datos central:', error);
-  }
+  });
+
+  // Encolamos en SyncQueue
+  await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
+    prayerRequestId: requestId,
+    userId,
+    interactionId,
+    type: 'PRAYED'
+  }, { endpoint: `/api/prayer-requests/${requestId}/pray`, method: 'POST' });
 }
 
-export async function prayAllPendingRequests(userId: string, workspaceId: string | null): Promise<number> {
-  if (!userId) {
-    throw new Error('Usuario no definido');
-  }
+export async function joinPrayerRequest(requestId: string, userId: string) {
+  const interactionId = uuidv4();
+
+  const existing = await db.prayerInteractions.get({ prayerRequestId: requestId, userId, type: 'JOINED' });
+  if (existing) return;
+
+  // Actualizamos Dexie (Optimistic UI)
+  await db.transaction('rw', db.prayerRequests, db.prayerInteractions, async () => {
+    await db.prayerInteractions.put({
+      id: interactionId,
+      prayerRequestId: requestId,
+      userId,
+      type: 'JOINED',
+      createdAt: new Date().toISOString()
+    });
+    
+    const req = await db.prayerRequests.get(requestId);
+    if (req) {
+      await db.prayerRequests.update(requestId, {
+        joinedCount: (req.joinedCount || 0) + 1
+      });
+    }
+  });
+
+  // Encolamos en SyncQueue
+  await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
+    prayerRequestId: requestId,
+    userId,
+    interactionId,
+    type: 'JOINED'
+  }, { endpoint: `/api/prayer-requests/${requestId}/join`, method: 'POST' });
+}
+
+export async function prayAllPendingRequests(userId: string): Promise<number> {
+  if (!userId) throw new Error('Usuario no definido');
 
   const now = new Date();
-  
-  // Para peticiones comunitarias, obtener de cualquier workspace (o sin workspace)
-  let requests;
-  if (workspaceId && workspaceId !== 'COMMUNITY') {
-    requests = await db.prayerRequests
-      .where('workspaceId')
-      .equals(workspaceId)
-      .filter((row) => row.userId !== userId && new Date(row.expiresAt) > now)
-      .toArray();
-  } else {
-    // Si no hay workspaceId o es COMMUNITY, obtener peticiones sin workspace (comunitarias)
-    requests = await db.prayerRequests
-      .filter((row) => 
-        row.userId !== userId && 
-        (row.workspaceId === null || row.workspaceId === 'COMMUNITY') && 
-        new Date(row.expiresAt) > now
-      )
-      .toArray();
-  }
-
   const interactions = await db.prayerInteractions.where('userId').equals(userId).toArray();
-  const prayedSet = new Set(interactions.map((interaction) => interaction.prayerRequestId));
+  const prayedSet = new Set(interactions.filter(i => i.type === 'PRAYED').map(i => i.prayerRequestId));
 
-  const pendingRequests = requests.filter((request) => !prayedSet.has(request.id));
+  const pendingRequests = await db.prayerRequests
+    .filter(row => 
+      row.userId !== userId && 
+      (row.workspaceId === 'COMMUNITY' || row.workspaceId === null) &&
+      new Date(row.expiresAt) > now &&
+      row.status !== 'ARCHIVED' &&
+      !prayedSet.has(row.id)
+    )
+    .toArray();
 
   for (const request of pendingRequests) {
-    await prayForRequest(request.id, userId, workspaceId);
+    await prayForRequest(request.id, userId);
   }
 
   return pendingRequests.length;
 }
 
-export function useMyPrayerRequests(userId: string | null, workspaceId: string | null) {
-  const result = useLiveQuery(async () => {
-    if (!userId) {
-      return { active: [], archived: [] };
-    }
+export function useMyPrayerRequests(userId: string | null) {
+  return useLiveQuery(async () => {
+    if (!userId) return { active: [], archived: [] };
 
-    let rows;
-    if (workspaceId && workspaceId !== 'COMMUNITY') {
-      rows = await db.prayerRequests
-        .where('workspaceId')
-        .equals(workspaceId)
-        .filter((row) => row.userId === userId)
-        .toArray();
-    } else {
-      // Para peticiones comunitarias, obtener las que no tienen workspace o son COMMUNITY
-      rows = await db.prayerRequests
-        .filter((row) => row.userId === userId && (row.workspaceId === null || row.workspaceId === 'COMMUNITY'))
-        .toArray();
-    }
+    const rows = await db.prayerRequests
+      .filter(row => row.userId === userId && (row.workspaceId === 'COMMUNITY' || row.workspaceId === null))
+      .toArray();
 
     const active: MyPrayerRequestDTO[] = [];
     const archived: MyPrayerRequestDTO[] = [];
     const now = new Date();
 
-    rows.forEach((row) => {
-      const item = formatPrayerRequestRow(row);
-      if (new Date(row.expiresAt) > now) {
-        active.push(item);
-      } else {
+    rows.forEach(row => {
+      const item: MyPrayerRequestDTO = formatPrayerRequestRow(row);
+      // Phase 1 mock properties
+      item.joinedCount = 0;
+
+      if (item.status === 'ACTIVE' && new Date(row.expiresAt) > now) active.push(item);
+      else {
+        item.status = 'ARCHIVED'; // ensure status is archived if expired
+        item.closeReason = item.closeReason || 'EXPIRED';
         archived.push(item);
       }
     });
@@ -191,196 +199,193 @@ export function useMyPrayerRequests(userId: string | null, workspaceId: string |
     archived.sort((a, b) => new Date(b.archivedAt || b.expiresAt).getTime() - new Date(a.archivedAt || a.expiresAt).getTime());
 
     return { active, archived };
-  }, [userId, workspaceId]) ?? { active: [], archived: [] };
-
-  return result;
+  }, [userId]) ?? { active: [], archived: [] };
 }
 
-export function useCommunityPrayerRequests(userId: string | null, workspaceId: string | null) {
-  const result = useLiveQuery(async () => {
+export function useCommunityPrayerRequests(userId: string | null) {
+  return useLiveQuery(async () => {
     if (!userId) {
-      return { pending: [], prayed: [], summary: { activeCount: 0, pendingCount: 0, prayedCount: 0 } };
+      return { pending: [], prayed: [], summary: { activeCount: 0, pendingCount: 0, unaccompaniedCount: 0, accompaniedCount: 0 } };
     }
 
     const now = new Date();
-    
-    // Obtener peticiones de oración de la base de datos local (Dexie)
-    // Para peticiones comunitarias, obtener las que no tienen workspace o pertenecen al workspace especificado
-    let localRequestRows;
-    if (workspaceId && workspaceId !== 'COMMUNITY') {
-      localRequestRows = await db.prayerRequests
-        .where('workspaceId')
-        .equals(workspaceId)
-        .filter((row) => row.userId !== userId)
-        .toArray();
-    } else {
-      // Obtener peticiones comunitarias (sin workspace o COMMUNITY)
-      localRequestRows = await db.prayerRequests
-        .filter((row) => 
-          row.userId !== userId && 
-          (row.workspaceId === null || row.workspaceId === 'COMMUNITY')
-        )
-        .toArray();
-    }
 
-    // Obtener también peticiones de la base de datos central (desde la API)
-    let serverRequestRows = [];
+    // === Datos locales ===
+    const localRequestRows = await db.prayerRequests
+      .filter(row => 
+        row.userId !== userId && 
+        (row.workspaceId === 'COMMUNITY' || row.workspaceId === null)
+      )
+      .toArray();
+
+    // === Datos del servidor ===
+    let serverRequestRows: any[] = [];
     try {
-      // Construir URL con parámetros válidos, omitiendo nulos
-      const params = new URLSearchParams();
-      params.append('scope', 'community');
-      params.append('userId', userId);
-      
-      // Pasar COMMUNITY si no hay workspace específico
-      if (!workspaceId) {
-        params.append('workspaceId', 'COMMUNITY');
-      } else if (workspaceId && workspaceId !== 'null') {
-        params.append('workspaceId', workspaceId);
+      const params = new URLSearchParams({ scope: 'community', userId });
+      const res = await fetch(`/api/prayer-requests?${params}`);
+      if (res.ok) {
+        const data = await res.json();
+        serverRequestRows = [...(data.pending || []), ...(data.prayed || [])];
       }
-      
-      const queryString = params.toString();
-      const response = await fetch(`/api/prayer-requests?${queryString}`);
-      if (response.ok) {
-        const data = await response.json();
-        serverRequestRows = data.pending.concat(data.prayed);
-      }
-    } catch (error) {
-      console.error('Error obteniendo peticiones de oración del servidor:', error);
-      // Continuar con solo los datos locales si falla la llamada al servidor
+    } catch (e) {
+      console.error('Error fetching from API:', e);
     }
 
-    // Combinar datos locales y del servidor, evitando duplicados
-    const combinedRequestRows = [...localRequestRows];
-    const existingIds = new Set(localRequestRows.map(row => row.id));
-    
-    for (const serverRow of serverRequestRows) {
-      if (!existingIds.has(serverRow.id)) {
-        combinedRequestRows.push({
-          id: serverRow.id,
-          message: serverRow.message,
-          status: serverRow.status,
-          prayerCount: serverRow.prayerCount,
-          createdAt: serverRow.createdAt,
-          updatedAt: serverRow.updatedAt || serverRow.createdAt,
-          expiresAt: serverRow.expiresAt,
-          archivedAt: serverRow.archivedAt,
-          userId: serverRow.userId,
-          workspaceId: serverRow.workspaceId || null
-        });
-        existingIds.add(serverRow.id);
+    // Combinar evitando duplicados
+    const combined = [...localRequestRows];
+    const existing = new Set(localRequestRows.map(r => r.id));
+
+    for (const srv of serverRequestRows) {
+      if (!existing.has(srv.id)) {
+        combined.push(srv);
+        existing.add(srv.id);
       }
     }
 
+    // === Procesamiento ===
     const interactions = await db.prayerInteractions.where('userId').equals(userId).toArray();
-    const prayedSet = new Set(interactions.map((interaction) => interaction.prayerRequestId));
+    const prayedSet = new Set(interactions.filter(i => i.type === 'PRAYED').map(i => i.prayerRequestId));
+    const joinedSet = new Set(interactions.filter(i => i.type === 'JOINED').map(i => i.prayerRequestId));
 
-    // Obtener autores de las peticiones combinadas
-    const authorIds = Array.from(new Set(combinedRequestRows.map((row) => row.userId)));
+    const authorIds = Array.from(new Set(combined.map(r => r.userId)));
     const authors = await db.users.where('id').anyOf(authorIds).toArray();
-    const authorMap = Object.fromEntries(authors.map((author) => [author.id, author]));
+    const authorMap = Object.fromEntries(authors.map(a => [a.id, a]));
 
     const pending: PrayerRequestDTO[] = [];
     const prayed: PrayerRequestDTO[] = [];
+    const unaccompanied: PrayerRequestDTO[] = [];
+    const accompanied: PrayerRequestDTO[] = [];
 
-    combinedRequestRows.forEach((row) => {
-      if (new Date(row.expiresAt) <= now) {
-        return;
-      }
-      const author = authorMap[row.userId];
-      const displayName = author ? `${(author.name || 'Hermano').split(' ')[0]}${author.lastName ? ` ${author.lastName[0].toUpperCase()}.` : ''}` : 'Hermano';
-      const initial = author ? (author.name?.trim()?.[0]?.toUpperCase() ?? 'H') : 'H';
-      const item: PrayerRequestDTO = {
-        id: row.id,
-        message: row.message,
-        status: 'ACTIVE',
-        prayerCount: row.prayerCount,
-        createdAt: row.createdAt,
-        expiresAt: row.expiresAt,
-        archivedAt: row.archivedAt ?? null,
-        daysRemaining: Math.max(0, Math.ceil((new Date(row.expiresAt).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))),
-        authorDisplayName: displayName,
-        authorInitial: initial,
-        hasPrayed: prayedSet.has(row.id)
-      };
+combined.forEach(row => {
+  if (new Date(row.expiresAt) <= now || row.status === 'ARCHIVED') return;
 
-      if (item.hasPrayed) {
-        prayed.push(item);
+  const author = authorMap[row.userId];
+  const rowAny = row as any;
+  let displayName = rowAny.authorDisplayName;
+  let initial = rowAny.authorInitial;
+
+  if (!displayName) {
+    if (author) {
+      const name = author.name?.trim();
+      const lastName = author.lastName?.trim();
+      const alias = (author as any).alias?.trim(); // if alias exists in the future
+
+      if (name && lastName) {
+        displayName = `${name.split(' ')[0]} ${lastName[0].toUpperCase()}.`;
+        initial = name[0].toUpperCase();
+      } else if (name) {
+        displayName = name.split(' ')[0];
+        initial = name[0].toUpperCase();
+      } else if (alias) {
+        displayName = alias;
+        initial = alias[0].toUpperCase();
       } else {
-        pending.push(item);
+        displayName = 'Usuario';
+        initial = 'U';
+        console.warn(`[PrayerModule] Warning: Public name fallback to 'Usuario' used for userId: ${row.userId}`);
       }
-    });
+    } else {
+      displayName = 'Usuario';
+      initial = 'U';
+      console.warn(`[PrayerModule] Warning: Author not found, falling back to 'Usuario' for userId: ${row.userId}`);
+    }
+  }
+
+  const item: PrayerRequestDTO = {
+    id: row.id,
+    message: row.message,
+    status: 'ACTIVE' as const,
+    prayerCount: row.prayerCount || 0,
+    createdAt: row.createdAt,
+    expiresAt: row.expiresAt,
+    archivedAt: row.archivedAt ?? null,
+    daysRemaining: Math.max(0, Math.ceil((new Date(row.expiresAt).getTime() - now.getTime()) / (86400000))),
+    authorDisplayName: displayName,
+    authorInitial: initial,
+    hasPrayed: prayedSet.has(row.id),
+    joinedCount: row.joinedCount || 0,
+    hasJoined: (row as any).hasJoined ?? joinedSet.has(row.id),
+  };
+
+  item.hasPrayed ? prayed.push(item) : pending.push(item);
+  item.hasJoined ? accompanied.push(item) : unaccompanied.push(item);
+});
 
     const activeCount = pending.length + prayed.length;
-    const prayedCount = prayed.length;
-    const pendingCount = pending.length;
+    const unaccompaniedCount = unaccompanied.length;
+    const accompaniedCount = accompanied.length;
 
     pending.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     prayed.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    unaccompanied.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    accompanied.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     return {
       pending,
       prayed,
-      summary: { activeCount, pendingCount, prayedCount }
+      unaccompanied,
+      accompanied,
+      summary: { 
+        activeCount, 
+        pendingCount: pending.length, 
+        unaccompaniedCount, 
+        accompaniedCount 
+      }
     };
-  }, [userId, workspaceId]) ?? { pending: [], prayed: [], summary: { activeCount: 0, pendingCount: 0, prayedCount: 0 } };
-
-  return result;
+  }, [userId]) ?? { pending: [], prayed: [], unaccompanied: [], accompanied: [], summary: { activeCount: 0, pendingCount: 0, unaccompaniedCount: 0, accompaniedCount: 0 } };
 }
 
-export function usePrayerStats(userId: string | null, workspaceId: string | null) {
-  const result = useLiveQuery(async () => {
-    if (!userId) {
-      return 0;
-    }
+export function usePrayerStats(userId: string | null): number {
+  const [serverCount, setServerCount] = useState<number>(0);
 
-    const now = new Date();
-    
-    // Obtener conteo de la base de datos local
-    let localCount;
-    if (workspaceId && workspaceId !== 'COMMUNITY') {
-      localCount = await db.prayerRequests
-        .where('workspaceId')
-        .equals(workspaceId)
-        .filter((row) => row.userId !== userId && new Date(row.expiresAt) > now)
-        .count();
-    } else {
-      localCount = await db.prayerRequests
-        .filter((row) => 
-          row.userId !== userId && 
-          (row.workspaceId === null || row.workspaceId === 'COMMUNITY') && 
-          new Date(row.expiresAt) > now
+  const localRows = useLiveQuery(
+    () => {
+      if (!userId) return [];
+      const now = new Date();
+      return db.prayerRequests
+        .filter(
+          (row) =>
+            row.userId !== userId &&
+            (row.workspaceId === 'COMMUNITY' || row.workspaceId === null) &&
+            new Date(row.expiresAt) > now &&
+            row.status !== 'ARCHIVED'
         )
-        .count();
-    }
+        .toArray();
+    },
+    [userId]
+  );
 
-    // Obtener conteo del servidor también
-    let serverCount = 0;
-    try {
-      // Construir URL con parámetros válidos, omitiendo nulos
-      const params = new URLSearchParams();
-      params.append('scope', 'stats');
-      params.append('excludeUserId', userId);
-      
-      // Pasar COMMUNITY si no hay workspace específico
-      if (!workspaceId) {
-        params.append('workspaceId', 'COMMUNITY');
-      } else if (workspaceId && workspaceId !== 'null') {
-        params.append('workspaceId', workspaceId);
+  const localCount = useMemo(() => {
+    if (!localRows) return 0;
+    return new Set(localRows.map((r) => r.userId)).size;
+  }, [localRows]);
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchStats = async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set('scope', 'stats');
+        if (userId) params.set('excludeUserId', userId);
+
+        const res = await fetch(`/api/prayer-requests?${params.toString()}`);
+        if (res.ok && isMounted) {
+          const data = await res.json();
+          setServerCount(data.activeCount || 0);
+        }
+      } catch (e) {
+        console.error('Error fetching stats from API:', e);
       }
-      
-      const queryString = params.toString();
-      const response = await fetch(`/api/prayer-requests?${queryString}`);
-      if (response.ok) {
-        const data = await response.json();
-        serverCount = data.activeCount || 0;
-      }
-    } catch (error) {
-      console.error('Error obteniendo estadísticas de oración del servidor:', error);
-    }
+    };
 
-    // Retornar el máximo de ambos conteos para mostrar la cantidad total disponible
-    return Math.max(localCount, serverCount);
-  }, [userId, workspaceId]) ?? 0;
+    fetchStats();
+    const intervalId = setInterval(fetchStats, 10000); // Poll every 10 seconds
 
-  return result;
-}
+    return () => {
+      isMounted = false;
+      clearInterval(intervalId);
+    };
+  }, [userId]);
+
+  return Math.max(localCount, serverCount);
+}

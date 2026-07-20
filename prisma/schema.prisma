@@ -313,6 +313,7 @@ model PrayerRequest {
   message     String    @db.VarChar(500)
   status      String    @default("ACTIVE") // ACTIVE | ARCHIVED
   prayerCount Int       @default(0)
+  joinedCount Int       @default(0)
   createdAt   DateTime  @default(now())
   expiresAt   DateTime
   archivedAt  DateTime?
@@ -329,12 +330,13 @@ model PrayerInteraction {
   id              String   @id @default(uuid()) @db.Uuid
   prayerRequestId String   @db.Uuid
   userId          String   @db.Uuid
+  type            String   @default("PRAYED") // PRAYED | JOINED
   createdAt       DateTime @default(now())
 
   prayerRequest PrayerRequest @relation(fields: [prayerRequestId], references: [id], onDelete: Cascade)
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([prayerRequestId, userId])
+  @@unique([prayerRequestId, userId, type])
 }
 
 // ─── Developer Info Request ──────────────────────────

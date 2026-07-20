@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import prisma from '@/lib/prisma';
 import { archiveExpiredPrayerRequests } from '@/lib/prayerRequests/archiveExpired';
+import { NotificationDispatcher } from '@/lib/notifications/NotificationDispatcher';
 
 async function ensurePrismaUserExists(userId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } });
@@ -9,7 +10,7 @@ async function ensurePrismaUserExists(userId: string) {
       data: {
         id: userId,
         email: `guest-${userId}@local.kadosh`,
-        name: 'Usuario',
+        name: null,
         lastName: null,
       },
     });
@@ -25,7 +26,7 @@ export async function POST(
 
     const { id } = await params;
     const body = await req.json();
-    const { userId } = body;
+    const { userId, interactionId } = body;
 
     if (!userId) {
       return NextResponse.json({ error: 'userId requerido' }, { status: 400 });
@@ -49,9 +50,10 @@ export async function POST(
 
     const existing = await prisma.prayerInteraction.findUnique({
       where: {
-        prayerRequestId_userId: {
+        prayerRequestId_userId_type: {
           prayerRequestId: id,
           userId,
+          type: 'PRAYED'
         },
       },
     });
@@ -64,7 +66,12 @@ export async function POST(
 
     await prisma.$transaction([
       prisma.prayerInteraction.create({
-        data: { prayerRequestId: id, userId },
+        data: { 
+          id: interactionId, // Idempotency key
+          prayerRequestId: id, 
+          userId, 
+          type: 'PRAYED' 
+        },
       }),
       prisma.prayerRequest.update({
         where: { id },
@@ -72,8 +79,15 @@ export async function POST(
       }),
     ]);
 
+    // TODO (OneSignal): Disparar notificación push al creador (prayerRequest.userId)
+    // Asunto: "Alguien está orando por ti"
+    await NotificationDispatcher.dispatchPrayerPrayed(prayerRequest.userId, id);
+
     return NextResponse.json({ success: true, alreadyPrayed: false });
-  } catch (error) {
+  } catch (error: any) {
+    if (error.code === 'P2002') {
+      return NextResponse.json({ success: true, alreadyPrayed: true });
+    }
     console.error('Error registrando oración:', error);
     return NextResponse.json({ error: 'Error interno del servidor' }, { status: 500 });
   }
