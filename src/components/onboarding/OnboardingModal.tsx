@@ -214,41 +214,6 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
 
   const { isIOS, isStandalone, deferredPrompt, promptInstall } = usePWA();
 
-  // Inicializar audio
-  useEffect(() => {
-    if (!audioRef.current) {
-      audioRef.current = new Audio(AUDIO_PATH);
-      audioRef.current.volume = 0;
-      audioRef.current.loop = true;
-    }
-
-    return () => {
-      if (audioRef.current) {
-        audioRef.current.pause();
-        audioRef.current = null;
-      }
-      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
-    };
-  }, []);
-
-  // Iniciar música SOLO cuando el onboarding es visible
-  useEffect(() => {
-    if (!visible || !audioRef.current || isPlayingRef.current) return;
-
-    const playAudio = async () => {
-      try {
-        await new Promise(resolve => setTimeout(resolve, 800));
-        await audioRef.current!.play();
-        isPlayingRef.current = true;
-        startFadeIn();
-      } catch (e) {
-        console.log("Audio autoplay blocked");
-      }
-    };
-
-    playAudio();
-  }, [visible]);
-
   const startFadeIn = useCallback(() => {
     if (!audioRef.current) return;
     if (fadeTimeoutRef.current) clearInterval(fadeTimeoutRef.current);
@@ -287,6 +252,66 @@ export function OnboardingModal({ onComplete }: { onComplete?: () => void }) {
       fadeTimeoutRef.current = null;
     }
   }, []);
+
+  // Inicializar audio
+  useEffect(() => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(AUDIO_PATH);
+      audioRef.current.volume = 0;
+      audioRef.current.loop = true;
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      if (fadeTimeoutRef.current) clearTimeout(fadeTimeoutRef.current);
+    };
+  }, []);
+
+  // Iniciar música SOLO cuando el onboarding es visible
+  useEffect(() => {
+    if (!visible || !audioRef.current || isPlayingRef.current) return;
+
+    const playAudio = async () => {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 800));
+        await audioRef.current!.play();
+        isPlayingRef.current = true;
+        startFadeIn();
+      } catch (e) {
+        console.log("Audio autoplay blocked. Waiting for interaction.");
+      }
+    };
+
+    playAudio();
+  }, [visible, startFadeIn]);
+
+  // Try to play on first user interaction if autoplay failed
+  useEffect(() => {
+    if (!visible) return;
+
+    const handleFirstInteraction = async () => {
+      if (audioRef.current && !isPlayingRef.current) {
+        try {
+          await audioRef.current.play();
+          isPlayingRef.current = true;
+          startFadeIn();
+        } catch (e) {
+          console.log("Audio play failed on interaction", e);
+        }
+      }
+    };
+
+    window.addEventListener('click', handleFirstInteraction, { once: true });
+    window.addEventListener('touchstart', handleFirstInteraction, { once: true });
+
+    return () => {
+      window.removeEventListener('click', handleFirstInteraction);
+      window.removeEventListener('touchstart', handleFirstInteraction);
+    };
+  }, [visible, startFadeIn]);
 
   // ── Lógica de inicio (PWA + Onboarding) ─────────────────────
   useEffect(() => {
