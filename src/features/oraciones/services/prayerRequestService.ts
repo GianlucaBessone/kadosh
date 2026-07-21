@@ -6,6 +6,8 @@ import { db } from '@/lib/db';
 import { addDays } from '@/features/oraciones/utils/formatDisplayName';
 import { v4 as uuidv4 } from 'uuid';
 import { addToSyncQueue } from '@/services/syncQueueService';
+import { syncEngine } from '@/services/syncEngine';
+import { processIncomingPrayerRequests } from './prayerSyncPipeline';
 import type { MyPrayerRequestDTO, PrayerRequestDTO, CommunityPrayerSummary } from '../types';
 
 const ACTIVE_DAYS = 7;
@@ -82,12 +84,11 @@ export async function cancelPrayerRequest(requestId: string, userId: string) {
 export async function prayForRequest(requestId: string, userId: string) {
   const interactionId = uuidv4();
   
-  // Verificamos si ya oramos localmente
-  const existing = await db.prayerInteractions.get({ prayerRequestId: requestId, userId, type: 'PRAYED' });
-  if (existing) return;
+  // Actualizamos Dexie (Optimistic UI) y SyncQueue de forma ATÓMICA
+  await db.transaction('rw', db.prayerRequests, db.prayerInteractions, db.syncQueue, async () => {
+    const existing = await db.prayerInteractions.get({ prayerRequestId: requestId, userId, type: 'PRAYED' });
+    if (existing) return;
 
-  // Actualizamos Dexie (Optimistic UI)
-  await db.transaction('rw', db.prayerRequests, db.prayerInteractions, async () => {
     await db.prayerInteractions.put({
       id: interactionId,
       prayerRequestId: requestId,
@@ -102,25 +103,28 @@ export async function prayForRequest(requestId: string, userId: string) {
         prayerCount: (req.prayerCount || 0) + 1
       });
     }
+
+    // Encolamos en SyncQueue atómicamente
+    await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
+      prayerRequestId: requestId,
+      userId,
+      interactionId,
+      type: 'PRAYED'
+    }, { endpoint: `/api/prayer-requests/${requestId}/pray`, method: 'POST' });
   });
 
-  // Encolamos en SyncQueue
-  await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
-    prayerRequestId: requestId,
-    userId,
-    interactionId,
-    type: 'PRAYED'
-  }, { endpoint: `/api/prayer-requests/${requestId}/pray`, method: 'POST' });
+  // Disparamos sincronización inmediata para la comunidad
+  syncEngine.sync().catch(console.error);
 }
 
 export async function joinPrayerRequest(requestId: string, userId: string) {
   const interactionId = uuidv4();
 
-  const existing = await db.prayerInteractions.get({ prayerRequestId: requestId, userId, type: 'JOINED' });
-  if (existing) return;
+  // Actualizamos Dexie y SyncQueue de forma ATÓMICA
+  await db.transaction('rw', db.prayerRequests, db.prayerInteractions, db.syncQueue, async () => {
+    const existing = await db.prayerInteractions.get({ prayerRequestId: requestId, userId, type: 'JOINED' });
+    if (existing) return;
 
-  // Actualizamos Dexie (Optimistic UI)
-  await db.transaction('rw', db.prayerRequests, db.prayerInteractions, async () => {
     await db.prayerInteractions.put({
       id: interactionId,
       prayerRequestId: requestId,
@@ -135,15 +139,18 @@ export async function joinPrayerRequest(requestId: string, userId: string) {
         joinedCount: (req.joinedCount || 0) + 1
       });
     }
+
+    // Encolamos en SyncQueue atómicamente
+    await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
+      prayerRequestId: requestId,
+      userId,
+      interactionId,
+      type: 'JOINED'
+    }, { endpoint: `/api/prayer-requests/${requestId}/join`, method: 'POST' });
   });
 
-  // Encolamos en SyncQueue
-  await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
-    prayerRequestId: requestId,
-    userId,
-    interactionId,
-    type: 'JOINED'
-  }, { endpoint: `/api/prayer-requests/${requestId}/join`, method: 'POST' });
+  // Disparamos sincronización inmediata para la comunidad
+  syncEngine.sync().catch(console.error);
 }
 
 export async function prayAllPendingRequests(userId: string): Promise<number> {
@@ -210,37 +217,13 @@ export function useCommunityPrayerRequests(userId: string | null) {
 
     const now = new Date();
 
-    // === Datos locales ===
-    const localRequestRows = await db.prayerRequests
+    // === Datos locales (Única fuente de verdad) ===
+    const combined = await db.prayerRequests
       .filter(row => 
         row.userId !== userId && 
         (row.workspaceId === 'COMMUNITY' || row.workspaceId === null)
       )
       .toArray();
-
-    // === Datos del servidor ===
-    let serverRequestRows: any[] = [];
-    try {
-      const params = new URLSearchParams({ scope: 'community', userId });
-      const res = await fetch(`/api/prayer-requests?${params}`);
-      if (res.ok) {
-        const data = await res.json();
-        serverRequestRows = [...(data.pending || []), ...(data.prayed || [])];
-      }
-    } catch (e) {
-      console.error('Error fetching from API:', e);
-    }
-
-    // Combinar evitando duplicados
-    const combined = [...localRequestRows];
-    const existing = new Set(localRequestRows.map(r => r.id));
-
-    for (const srv of serverRequestRows) {
-      if (!existing.has(srv.id)) {
-        combined.push(srv);
-        existing.add(srv.id);
-      }
-    }
 
     // === Procesamiento ===
     const interactions = await db.prayerInteractions.where('userId').equals(userId).toArray();
@@ -336,56 +319,73 @@ combined.forEach(row => {
 }
 
 export function usePrayerStats(userId: string | null): number {
-  const [serverCount, setServerCount] = useState<number>(0);
+  const localCount = useLiveQuery(async () => {
+    if (!userId) return 0;
+    const now = new Date();
+    
+    // Contamos solo peticiones de otros usuarios en comunidad que no han expirado ni están archivadas
+    const count = await db.prayerRequests
+      .filter(row => 
+        row.userId !== userId && 
+        (row.workspaceId === 'COMMUNITY' || row.workspaceId === null) &&
+        new Date(row.expiresAt) > now &&
+        row.status !== 'ARCHIVED'
+      )
+      .count();
+      
+    return count;
+  }, [userId]) ?? 0;
 
-  const localRows = useLiveQuery(
-    () => {
-      if (!userId) return [];
-      const now = new Date();
-      return db.prayerRequests
-        .filter(
-          (row) =>
-            row.userId !== userId &&
-            (row.workspaceId === 'COMMUNITY' || row.workspaceId === null) &&
-            new Date(row.expiresAt) > now &&
-            row.status !== 'ARCHIVED'
-        )
-        .toArray();
-    },
-    [userId]
-  );
+  return localCount;
+}
 
-  const localCount = useMemo(() => {
-    if (!localRows) return 0;
-    return new Set(localRows.map((r) => r.userId)).size;
-  }, [localRows]);
-
+export function useSyncPrayerRequests(userId: string | null) {
   useEffect(() => {
-    let isMounted = true;
-    const fetchStats = async () => {
-      try {
-        const params = new URLSearchParams();
-        params.set('scope', 'stats');
-        if (userId) params.set('excludeUserId', userId);
+    if (!userId) return;
 
-        const res = await fetch(`/api/prayer-requests?${params.toString()}`);
+    let isMounted = true;
+    const syncData = async () => {
+      try {
+        const params = new URLSearchParams({ scope: 'community', userId });
+        const res = await fetch(`/api/prayer-requests?${params}`);
         if (res.ok && isMounted) {
           const data = await res.json();
-          setServerCount(data.activeCount || 0);
+          const serverRequestRows = [...(data.pending || []), ...(data.prayed || [])];
+          
+          // Agregamos currentUserId al DTO para que el pipeline sincronice los interacciones del usuario actual
+          const requestsForPipeline = serverRequestRows.map(r => ({ ...r, currentUserId: userId }));
+          
+          await processIncomingPrayerRequests(requestsForPipeline);
         }
       } catch (e) {
-        console.error('Error fetching stats from API:', e);
+        console.error('Error fetching community prayers from API:', e);
       }
     };
 
-    fetchStats();
-    const intervalId = setInterval(fetchStats, 10000); // Poll every 10 seconds
+    // Sincronización inicial
+    syncData();
+
+    // Intervalo de sincronización periódico (ej. cada 60 seg) para respaldar el Realtime
+    const intervalId = setInterval(syncData, 60000);
+
+    // Recuperación ante suspensión de pestaña o desconexión
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        syncData();
+      }
+    };
+    const handleOnline = () => {
+      syncData();
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('online', handleOnline);
 
     return () => {
       isMounted = false;
       clearInterval(intervalId);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('online', handleOnline);
     };
   }, [userId]);
-
-  return Math.max(localCount, serverCount);
 }

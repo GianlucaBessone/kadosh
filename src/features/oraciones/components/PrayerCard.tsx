@@ -119,7 +119,7 @@ export const PrayerCard = React.memo(function PrayerCard({
               </Button>
             ) : (
               <span className="text-xs font-semibold text-blue-500 flex items-center gap-1">
-                <Users className="h-4 w-4" /> Te sumaste
+                <Users className="h-4 w-4" /> Te uniste
               </span>
             )}
           </div>

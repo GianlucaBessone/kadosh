@@ -34,29 +34,21 @@ export function PrayerTabs({
 }: PrayerTabsProps) {
   // Sort and filter logic based on the specs
   const lists = useMemo(() => {
-    // Pendientes: >0 joined (or prayed), but user hasn't joined. Actually, in Phase 1 we mapped "no acompañadas" to prayerCount === 0.
-    // In Phase 4, the lists come already filtered by `useCommunityPrayerRequests`.
-    // pendingRequests = not prayed by user.
-    // prayedRequests = prayed by user.
-    // unaccompaniedRequests = not joined by user.
-    // accompaniedRequests = joined by user.
-
-    // Let's adapt the tabs to use the "unaccompanied" and "accompanied" concepts properly for the Community.
-    // "Pendientes": Unaccompanied requests that HAVE at least one join/pray (to be ordered).
-    const pendientes = unaccompaniedRequests
+    // "Pendientes": Not prayed by user, but has at least one join/pray from anyone
+    const pendientes = pendingRequests
       .filter((req) => req.joinedCount > 0 || req.prayerCount > 0)
       .sort((a, b) => a.joinedCount - b.joinedCount);
 
-    // "No acompañadas": Unaccompanied requests with 0 joins and 0 prayers.
-    const noAcompanadas = unaccompaniedRequests
+    // "No acompañadas": Not prayed by user, with 0 joins and 0 prayers
+    const noAcompanadas = pendingRequests
       .filter((req) => req.joinedCount === 0 && req.prayerCount === 0)
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    // "Acompañadas": Joined by user (or prayed, depending on definition, but typically joined).
-    const acompanadas = accompaniedRequests;
+    // "Acompañadas": Prayed by user
+    const acompanadas = prayedRequests;
 
     return { pendientes, noAcompanadas, acompanadas };
-  }, [unaccompaniedRequests, accompaniedRequests]);
+  }, [pendingRequests, prayedRequests]);
 
   const tabs: { id: TabType; label: string; count: number }[] = [
     { id: 'pendientes', label: 'Pendientes', count: lists.pendientes.length },

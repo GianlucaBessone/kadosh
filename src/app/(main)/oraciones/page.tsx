@@ -20,7 +20,9 @@ import {
   cancelPrayerRequest,
   useCommunityPrayerRequests,
   useMyPrayerRequests,
+  useSyncPrayerRequests,
 } from '@/features/oraciones/services/prayerRequestService';
+import { usePrayerRealtime } from '@/features/oraciones/services/usePrayerRealtime';
 
 import type { OracionesView } from '@/features/oraciones/types';
 
@@ -39,6 +41,10 @@ export default function OracionesPage() {
   
   const { pending: communityPending, prayed: communityPrayed, unaccompanied, accompanied, summary: communitySummary } =
     useCommunityPrayerRequests(user?.id ?? null);
+
+  // Initialize Realtime and Sync hooks
+  useSyncPrayerRequests(user?.id ?? null);
+  usePrayerRealtime(user?.id ?? null);
 
   // In a future phase, we will track if user prayed for all today using local storage or db.
   // For now, we assume `true` so they can use it, unless pendingCount is 0.

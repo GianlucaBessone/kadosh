@@ -50,8 +50,8 @@ export async function GET(req: Request) {
 
       return NextResponse.json({
         active: requests
-          .filter(r => r.status === 'ACTIVE')
-          .map(r => ({
+          .filter((r: any) => r.status === 'ACTIVE')
+          .map((r: any) => ({
             id: r.id,
             message: r.message,
             status: r.status,
@@ -63,8 +63,8 @@ export async function GET(req: Request) {
             daysRemaining: getDaysRemaining(r.expiresAt),
           })),
         archived: requests
-          .filter(r => r.status === 'ARCHIVED')
-          .map(r => ({
+          .filter((r: any) => r.status === 'ARCHIVED')
+          .map((r: any) => ({
             id: r.id,
             message: r.message,
             status: r.status,
@@ -104,10 +104,11 @@ export async function GET(req: Request) {
         orderBy: { createdAt: 'desc' },
       });
 
-      const items = requests.map(r => {
+      const items = requests.map((r: any) => {
         const { displayName, initial } = formatDisplayName(r.user.name, r.user.lastName);
         return {
           id: r.id,
+          userId: r.userId,
           message: r.message,
           status: r.status as 'ACTIVE',
           prayerCount: r.prayerCount,
@@ -118,23 +119,25 @@ export async function GET(req: Request) {
           daysRemaining: getDaysRemaining(r.expiresAt),
           authorDisplayName: displayName,
           authorInitial: initial,
-          hasPrayed: r.interactions.some(i => i.type === 'PRAYED'),
-          hasJoined: r.interactions.some(i => i.type === 'JOINED'),
+          name: r.user.name,
+          lastName: r.user.lastName,
+          hasPrayed: r.interactions.some((i: any) => i.type === 'PRAYED'),
+          hasJoined: r.interactions.some((i: any) => i.type === 'JOINED'),
         };
       });
 
       const activeCount = items.length;
-      const prayedCount = items.filter(i => i.hasPrayed).length;
-      const unaccompaniedCount = items.filter(i => !i.hasJoined).length;
-      const accompaniedCount = items.filter(i => i.hasJoined).length;
+      const prayedCount = items.filter((i: any) => i.hasPrayed).length;
+      const unaccompaniedCount = items.filter((i: any) => !i.hasJoined).length;
+      const accompaniedCount = items.filter((i: any) => i.hasJoined).length;
       const pendingCount = activeCount - prayedCount;
 
       return NextResponse.json({
         summary: { activeCount, pendingCount, prayedCount, unaccompaniedCount, accompaniedCount },
-        pending: items.filter(i => !i.hasPrayed),
-        prayed: items.filter(i => i.hasPrayed),
-        unaccompanied: items.filter(i => !i.hasJoined),
-        accompanied: items.filter(i => i.hasJoined),
+        pending: items.filter((i: any) => !i.hasPrayed),
+        prayed: items.filter((i: any) => i.hasPrayed),
+        unaccompanied: items.filter((i: any) => !i.hasJoined),
+        accompanied: items.filter((i: any) => i.hasJoined),
       });
     }
 
@@ -163,36 +166,19 @@ export async function POST(req: Request) {
       );
     }
 
-    let user = await prisma.user.findUnique({ where: { id: userId } });
-    if (!user) {
-      user = await prisma.user.create({
-        data: {
-          id: userId,
-          email: `guest-${userId}@local.kadosh`,
-          name: name || null,
-          lastName: lastName || null,
-        },
-      });
-    } else {
-      const trimmedName = name?.trim();
-      const trimmedLastName = lastName?.trim();
-      const isPlaceholderName = !user.name || user.name.trim() === '' || user.name === 'Usuario';
-
-      if (trimmedName && isPlaceholderName) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: {
-            name: trimmedName,
-            lastName: trimmedLastName || user.lastName,
-          },
-        });
-      } else if (trimmedLastName && !user.lastName) {
-        await prisma.user.update({
-          where: { id: userId },
-          data: { lastName: trimmedLastName },
-        });
-      }
-    }
+    let user = await prisma.user.upsert({
+      where: { id: userId },
+      update: {
+        name: name?.trim() || undefined,
+        lastName: lastName?.trim() || undefined,
+      },
+      create: {
+        id: userId,
+        email: `guest-${userId}@local.kadosh`,
+        name: name?.trim() || null,
+        lastName: lastName?.trim() || null,
+      },
+    });
 
     const now = new Date();
     

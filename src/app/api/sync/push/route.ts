@@ -24,10 +24,10 @@ export async function POST(request: Request) {
       where: { userId: user.id },
       select: { workspaceId: true }
     });
-    const validWorkspaceIds = new Set(userWorkspaces.map(w => w.workspaceId));
+    const validWorkspaceIds = new Set(userWorkspaces.map((w: any) => w.workspaceId));
 
     // 2. Procesar e insertar los eventos de forma transaccional
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       for (const event of events) {
         // Validar membresía del Workspace
         if (!validWorkspaceIds.has(event.workspaceId)) {

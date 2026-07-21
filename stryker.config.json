@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "pnpm",
+  "reporters": ["html", "clear-text", "progress"],
+  "testRunner": "vitest",
+  "coverageAnalysis": "perTest",
+  "mutate": [
+    "src/features/oraciones/services/**/*.ts",
+    "src/features/oraciones/hooks/**/*.ts",
+    "src/features/oraciones/components/**/*.tsx",
+    "!src/**/*.test.{ts,tsx}",
+    "!src/**/*.d.ts"
+  ]
+}

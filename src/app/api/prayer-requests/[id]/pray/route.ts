@@ -25,7 +25,8 @@ export async function POST(
     await archiveExpiredPrayerRequests();
 
     const { id } = await params;
-    const body = await req.json();
+    const text = await req.text();
+    const body = text ? JSON.parse(text) : {};
     const { userId, interactionId } = body;
 
     if (!userId) {

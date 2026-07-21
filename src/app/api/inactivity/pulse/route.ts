@@ -3,7 +3,12 @@ import prisma from '@/lib/prisma';
 
 export async function POST(req: Request) {
   try {
-    const body = await req.json();
+    let body: any = {};
+    try {
+      body = await req.json();
+    } catch (e) {
+      return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 });
+    }
     const { userHash, hasActivity } = body;
 
     if (!userHash) {

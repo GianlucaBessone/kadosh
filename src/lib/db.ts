@@ -793,6 +793,10 @@ export class KadoshDB extends Dexie {
 export const db = new KadoshDB();
 createDexieProfiler(db);
 
+if (typeof window !== 'undefined') {
+  (window as any).__KADOSH_DB__ = db;
+}
+
 // Función para limpiar todo (útil para testing)
 export async function clearAllUserData() {
   await db.transaction('rw', db.tables, async () => {

@@ -17,7 +17,7 @@ export async function POST(request: Request) {
     }
 
     // Execute within a transaction
-    const result = await prisma.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx: any) => {
       const existingWorkspace = await tx.workspace.findUnique({
         where: { id: workspaceId }
       });

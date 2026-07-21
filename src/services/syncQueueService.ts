@@ -29,15 +29,23 @@ export async function addToSyncQueue(
 export async function processSyncQueue() {
   if (typeof window === 'undefined' || !navigator.onLine) return;
 
+  const twoMinutesAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
   const pending = await db.syncQueue
-    .where('status').anyOf(['PENDING', 'ERROR'])
+    .filter(item => 
+      item.status === 'PENDING' || 
+      item.status === 'ERROR' || 
+      (item.status === 'PROCESSING' && (!item.lastAttempt || item.lastAttempt < twoMinutesAgo))
+    )
     .toArray();
 
   if (pending.length === 0) return;
 
   for (const item of pending) {
     try {
-      await db.syncQueue.update(item.id, { status: 'PROCESSING' });
+      await db.syncQueue.update(item.id, { 
+        status: 'PROCESSING',
+        lastAttempt: new Date().toISOString()
+      });
       
       let endpoint = '';
       let method = '';
@@ -77,12 +85,12 @@ export async function processSyncQueue() {
 
   // Cleanup SYNCED older than 7 days
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const oldSynced = await db.syncQueue
-    .where('status').equals('SYNCED')
-    .filter(item => item.updatedAt < sevenDaysAgo)
-    .primaryKeys();
+  const syncedItems = await db.syncQueue.toArray();
+  const oldSyncedIds = syncedItems
+    .filter(item => item.status === 'SYNCED' && item.updatedAt < sevenDaysAgo)
+    .map(item => item.id);
     
-  if (oldSynced.length > 0) {
-    await db.syncQueue.bulkDelete(oldSynced as string[]);
+  if (oldSyncedIds.length > 0) {
+    await db.syncQueue.bulkDelete(oldSyncedIds as string[]);
   }
 }
