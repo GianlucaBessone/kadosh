@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from 'react';
 import { Leaf, ScanFace, Delete } from 'lucide-react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { hasLocalPin, setLocalPin, verifyLocalPin, clearLocalAuth, isBiometricsSupported, hasBiometricsEnrolled, setupBiometrics, verifyBiometrics } from '@/features/auth/localAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -13,7 +13,6 @@ type AuthState = 'LOADING' | 'LOGIN' | 'SETUP_PIN_1' | 'SETUP_PIN_2' | 'BIOMETRI
 
 function LoginContent() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [authState, setAuthState] = useState<AuthState>('LOADING');
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState('');
@@ -42,8 +41,7 @@ function LoginContent() {
       const enrolled = hasBiometricsEnrolled();
       setHasBio(enrolled);
 
-      const isSetup = searchParams.get('setup');
-      const newState = (!hasLocalPin() || isSetup === 'true') ? 'SETUP_PIN_1' : 'LOGIN';
+      const newState = !hasLocalPin() ? 'SETUP_PIN_1' : 'LOGIN';
       setAuthState(newState);
 
       // Auto-prompt biometrics if returning user
@@ -53,7 +51,7 @@ function LoginContent() {
     }
     const timer = setTimeout(() => loadData(), 0);
     return () => clearTimeout(timer);
-  }, [searchParams, handleBiometricLogin]);
+  }, [handleBiometricLogin]);
 
 
   const handlePinSubmit = async (e: React.FormEvent) => {
@@ -216,13 +214,13 @@ function LoginContent() {
              authState === 'REMOVE_USER_PIN' ? 'Ingresa tu PIN para confirmar la eliminación de tu perfil.' :
              authState === 'SYNC_PROMPT' ? 'Sincronización en la nube' :
              authState === 'BIOMETRIC_PROMPT' ? 'Acceso rápido' :
-             'Configura tu perfil y PIN local.'}
+             user ? `Hola ${user.name || 'de nuevo'}, configura un PIN para este dispositivo.` : 'Configura tu perfil y PIN local.'}
           </p>
         </div>
 
         {(authState === 'LOGIN' || authState === 'SETUP_PIN_1' || authState === 'SETUP_PIN_2' || authState === 'REMOVE_USER_PIN') && (
           <form onSubmit={handlePinSubmit} className="flex flex-col flex-1 pb-safe" noValidate>
-            {authState === 'SETUP_PIN_1' && (
+            {authState === 'SETUP_PIN_1' && !user && (
               <div className="space-y-2 mb-2 flex gap-2">
                 <Input 
                   id="name" 
@@ -250,7 +248,7 @@ function LoginContent() {
             <div className="flex flex-col items-center w-full mt-auto">
               <div className="h-6 mb-2">
                 <p className="text-sm font-medium text-muted-foreground text-center">
-                  {authState === 'SETUP_PIN_2' ? 'Confirma tu PIN' : (authState === 'SETUP_PIN_1' ? 'Crea un PIN (mín. 4)' : '')}
+                  {authState === 'SETUP_PIN_2' ? 'Confirma tu PIN' : (authState === 'SETUP_PIN_1' ? (user ? 'Ingresa un PIN (mín. 4)' : 'Crea un PIN (mín. 4)') : '')}
                 </p>
               </div>
 

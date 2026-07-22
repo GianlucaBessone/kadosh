@@ -38,6 +38,7 @@ interface CommitmentCardProps {
   dueDate: Date;
   installmentNumber: number;
   onEdit?: () => void;
+  onClick?: () => void;
   onViewHistory?: () => void;
   onPaymentDone?: () => void;
   onUpdateAlarm?: (hasReminder: boolean, time: string, days: number) => Promise<void>;
@@ -62,6 +63,7 @@ export function CommitmentCard({
   dueDate,
   installmentNumber,
   onEdit,
+  onClick,
   onViewHistory,
   onPaymentDone,
   onUpdateAlarm,
@@ -127,7 +129,11 @@ export function CommitmentCard({
     if ((e.target as HTMLElement).closest('button, a')) {
       return;
     }
-    setShowOptions(v => !v);
+    if (onClick) {
+      onClick();
+    } else {
+      setShowOptions(v => !v);
+    }
   };
 
   return (
@@ -162,7 +168,7 @@ export function CommitmentCard({
                 <IconComponent className="w-6 h-6" strokeWidth={1.5} />
               </div>
               <div className="min-w-0">
-                <Link href={`/planning/${commitment.id}`} className="hover:underline">
+                <Link href={`/planning?id=${commitment.id}`} className="hover:underline">
                   <h3 className="font-semibold text-foreground text-base leading-tight truncate">
                     {commitment.name}
                   </h3>
@@ -335,7 +341,7 @@ export function CommitmentCard({
               )}
 
               <Link
-                href={`/planning/${commitment.id}`}
+                href={`/planning?id=${commitment.id}`}
                 className="text-xs font-medium text-primary hover:text-primary/80 transition-colors"
               >
                 Ver detalles

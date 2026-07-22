@@ -22,6 +22,10 @@ export function DeveloperCard() {
     
     // Check initial status
     const checkStatus = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        setStatus('IDLE');
+        return;
+      }
       try {
         const response = await fetch(`/api/developer-info?userId=${user.isCloudLinked ? user.id : ''}&guestId=${!user.isCloudLinked ? user.id : ''}`);
         if (response.ok) {
@@ -45,6 +49,7 @@ export function DeveloperCard() {
     if (status !== 'PENDING' || !user) return;
     
     const interval = setInterval(async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
       try {
         const response = await fetch(`/api/developer-info?userId=${user.isCloudLinked ? user.id : ''}&guestId=${!user.isCloudLinked ? user.id : ''}`);
         if (response.ok) {

@@ -58,6 +58,9 @@ export function validateCommitmentForm(data: CommitmentFormData): ValidationResu
     if (!data.installments || data.installments < 1) {
       errors.installments = 'Ingresá la cantidad de cuotas.';
     }
+    if (!data.amountTotal || data.amountTotal <= 0) {
+      errors.amountTotal = 'El monto total debe ser mayor a 0.';
+    }
     if (!data.installmentAmount || data.installmentAmount <= 0) {
       errors.installmentAmount = 'El valor de la cuota debe ser mayor a 0.';
     }

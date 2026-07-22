@@ -211,6 +211,10 @@ export class PlanningService {
   }
 
   static async getNextCommitment(ownerId: string): Promise<MonthlyCommitmentItem | null> {
+    // Dummy query to ensure dexie-react-hooks tracks this table before any await
+    await db.commitmentPayments.limit(1).toArray();
+    await db.financialCommitments.limit(1).toArray();
+    
     const now = new Date();
     now.setHours(0, 0, 0, 0);
     const month = now.getMonth() + 1;

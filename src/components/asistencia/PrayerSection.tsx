@@ -6,6 +6,8 @@ import { Loader2, HandHeart } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db } from '@/lib/db';
 import { toast } from 'sonner';
+import { v4 as uuidv4 } from 'uuid';
+import { addToSyncQueue } from '@/services/syncQueueService';
 
 export function PrayerSection() {
   const [loading, setLoading] = useState(false);
@@ -75,18 +77,14 @@ export function PrayerSection() {
     if (!user) return;
     setLoading(true);
     try {
-      const response = await fetch('/api/prayer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          userId: user.isCloudLinked ? user.id : null,
-          guestId: !user.isCloudLinked ? user.id : null,
-        }),
-      });
+      const interactionId = uuidv4();
 
-      if (!response.ok) {
-        throw new Error('Error al registrar oración');
-      }
+      await addToSyncQueue('prayerInteractions', interactionId, 'INSERT', {
+        userId: user.isCloudLinked ? user.id : null,
+        guestId: !user.isCloudLinked ? user.id : null,
+        type: 'PROJECT_PRAYER',
+        interactionId
+      }, { endpoint: '/api/prayer', method: 'POST' });
 
       playPeacefulChime();
       setBackgroundAudio(startBackgroundPad());

@@ -1,7 +1,8 @@
 'use client';
 
 import { Plus, Droplet } from 'lucide-react'
-import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PlantAvatar } from '@/components/seeds/PlantAvatar'
@@ -11,7 +12,17 @@ import { WorkspaceQueries } from '@/store/queries/WorkspaceQueries'
 import { MotivationalVerseService } from '@/services/motivationalVerseService'
 import { useEffect, useState } from 'react'
 
-export default function SeedsPage() {
+import { SeedDetailModal } from '@/components/seeds/SeedDetailModal'
+
+function SeedsPageContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedSeedId = searchParams.get('id');
+
+  const closeSeedModal = () => {
+    router.replace('/seeds');
+  };
+
   const seeds = WorkspaceQueries.useSeeds();
   // Filter and sort manually
   const filteredSeeds = [...seeds]
@@ -58,7 +69,7 @@ export default function SeedsPage() {
           const isReady = progress >= 100 && !isHarvested
 
           return (
-            <Link href={`/seeds/${seed.id}`} key={seed.id} prefetch={true}>
+            <div key={seed.id} onClick={() => router.push(`?id=${seed.id}`)} className="cursor-pointer">
               <Card className={`rounded-3xl border-border/50 shadow-sm overflow-hidden relative group hover:shadow-md transition-all ${isReady ? 'border-gold/30 bg-gold/5' : ''}`}>
                 <div 
                   className={`absolute top-0 left-0 h-1 transition-all duration-1000 ease-in-out ${isReady ? 'bg-gold' : 'bg-secondary'}`}
@@ -95,10 +106,25 @@ export default function SeedsPage() {
                   )}
                 </CardContent>
               </Card>
-            </Link>
+            </div>
           )
         })}
       </div>
+
+      {selectedSeedId && (
+        <SeedDetailModal 
+          seedId={selectedSeedId} 
+          onClose={closeSeedModal} 
+        />
+      )}
     </div>
+  )
+}
+
+export default function SeedsPage() {
+  return (
+    <Suspense fallback={<div className="p-8 text-center text-muted-foreground">Cargando...</div>}>
+      <SeedsPageContent />
+    </Suspense>
   )
 }

@@ -141,7 +141,7 @@ export default function HomePage() {
   const pendingTithe = Math.max(0, suggestedTithe - totalPaidTithe);
 
   // Next upcoming commitment
-  const nextCommitmentData = useLiveQuery(() => PlanningService.getNextCommitment('local-user'), []);
+  const nextCommitmentData = useLiveQuery(() => PlanningService.getNextCommitment(workspace?.id || ''), [workspace?.id]);
 
   if (!isMounted) return null;
 

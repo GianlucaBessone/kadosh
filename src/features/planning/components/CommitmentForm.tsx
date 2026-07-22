@@ -229,6 +229,10 @@ export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
       }
 
       onSuccess?.();
+      
+      // Delay to allow CQRS ProjectionEngine to process the event locally before re-rendering the list
+      await new Promise(resolve => setTimeout(resolve, 150));
+      
       router.push('/planning');
     } catch (err) {
       console.error(err);
@@ -353,7 +357,7 @@ export function CommitmentForm({ initial, onSuccess }: CommitmentFormProps) {
       {/* Primer vencimiento */}
       <Field label="Primer vencimiento" error={errors.firstDueDate}>
         <DatePicker
-          value={firstDueDate ? new Date(firstDueDate + "T00:00:00") : undefined}
+          value={firstDueDate ? new Date(Number(firstDueDate.split('-')[0]), Number(firstDueDate.split('-')[1]) - 1, Number(firstDueDate.split('-')[2])) : undefined}
           onChange={date => setFirstDueDate(date ? getLocalYYYYMMDD(date) : "")}
           className={inputClass}
         />

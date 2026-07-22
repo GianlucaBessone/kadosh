@@ -11,12 +11,15 @@ import { MonthlySummaryCard } from '@/features/planning/components/MonthlySummar
 import { CommitmentCard } from '@/features/planning/components/CommitmentCard';
 import { SimulatorModal } from '@/features/planning/components/SimulatorModal';
 import { PaymentHistorySheet } from '@/features/planning/components/PaymentHistorySheet';
+import { CommitmentDetailSheet } from '@/features/planning/components/CommitmentDetailSheet';
+import { EditCommitmentSheet } from '@/features/planning/components/EditCommitmentSheet';
 import { useCommitmentPayments, usePausedCommitments } from '@/features/planning/hooks/usePlanningData';
 import type { FinancialCommitment } from '@/lib/db';
 import { PausedCommitmentCard } from '@/features/planning/components/PausedCommitmentCard';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { PeriodSelector } from '@/components/shared/PeriodSelector';
 import type { PlanningPeriod } from '@/features/planning/types';
+import { Suspense } from 'react';
 
 function PaymentHistoryWrapper({
   commitment,
@@ -31,7 +34,7 @@ function PaymentHistoryWrapper({
   );
 }
 
-export default function PlanningPage() {
+function PlanningPageContent() {
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line
@@ -45,6 +48,13 @@ export default function PlanningPage() {
   const [showSimulator, setShowSimulator] = useState(false);
   const [historyCommitment, setHistoryCommitment] = useState<FinancialCommitment | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const selectedCommitmentId = searchParams.get('id');
+  const isEditing = searchParams.get('edit') === 'true';
+
+  const closeModals = () => {
+    router.replace('/planning');
+  };
 
   const ownerId = 'local-user';
 
@@ -165,7 +175,8 @@ export default function PlanningPage() {
                 commitment={commitment}
                 dueDate={dueDate}
                 installmentNumber={installmentNumber}
-                onEdit={() => router.push(`/planning/${commitment.id}/edit`)}
+                onClick={() => router.push(`?id=${commitment.id}`)}
+                onEdit={() => router.push(`?id=${commitment.id}&edit=true`)}
                 onViewHistory={() => setHistoryCommitment(commitment)}
                 onUpdateAlarm={(hasReminder, time, days) => handleUpdateAlarm(commitment, hasReminder, time, days)}
               />
@@ -237,6 +248,31 @@ export default function PlanningPage() {
           onClose={() => setHistoryCommitment(null)}
         />
       )}
+
+      {/* Detail sheet */}
+      {selectedCommitmentId && !isEditing && (
+        <CommitmentDetailSheet
+          commitmentId={selectedCommitmentId}
+          onClose={closeModals}
+          onEdit={() => router.push(`?id=${selectedCommitmentId}&edit=true`)}
+        />
+      )}
+
+      {/* Edit sheet */}
+      {selectedCommitmentId && isEditing && (
+        <EditCommitmentSheet
+          commitmentId={selectedCommitmentId}
+          onClose={closeModals}
+        />
+      )}
     </div>
+  );
+}
+
+export default function PlanningPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-muted-foreground">Cargando...</div>}>
+      <PlanningPageContent />
+    </Suspense>
   );
 }

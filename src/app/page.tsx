@@ -24,7 +24,7 @@ export default function BootstrapPage() {
       // Check if user has set up local PIN
       if (!hasLocalPin()) {
         // Show login/setup
-        router.replace('/login?setup=true');
+        router.replace('/login');
         setLoading(false);
         return;
       }
